@@ -278,6 +278,19 @@ export default function Dashboard() {
     return demarkData.slice(-n);
   }, [demarkData, range]);
 
+  // Merge risk line into price data for chart overlay (must be before early returns — hooks rule)
+  const priceWithRisk = useMemo(() => {
+    if (!filteredDemark.length || !filtered.length) return filtered;
+    const demarkByDate = {};
+    for (const d of filteredDemark) {
+      if (d.riskLine !== null) demarkByDate[d.date] = d.riskLine;
+    }
+    return filtered.map(row => ({
+      ...row,
+      riskLine: demarkByDate[row.date] ?? null,
+    }));
+  }, [filtered, filteredDemark]);
+
   if (loading || !primaryData) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: T.cyan, fontSize: 14, fontFamily: "monospace" }}>Loading {ticker} data…</div>
@@ -336,6 +349,8 @@ export default function Dashboard() {
     }
   }
   const lastDemarkSignal = demarkSignals.length > 0 ? demarkSignals[demarkSignals.length - 1] : null;
+  const currentRiskLine = hasDemark ? demarkLatest.riskLine : null;
+  const currentRiskLineType = hasDemark ? demarkLatest.riskLineType : null;
 
   // Combined signal badge
   const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : (hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : T.muted);
@@ -358,6 +373,9 @@ export default function Dashboard() {
     const lastSigLabel = lastDemarkSignal ? lastDemarkSignal.signal.replace(/_/g, " ") : "None";
     const lastSigColor = lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted;
     kpis.push({ label: "LAST SIGNAL", value: lastSigLabel, color: lastSigColor, sub: lastDemarkSignal?.date || "—" });
+    if (currentRiskLine) {
+      kpis.push({ label: "RISK LINE", value: `$${currentRiskLine}`, color: T.red, sub: `${currentRiskLineType} stop-loss` });
+    }
   }
 
   return (
@@ -421,9 +439,16 @@ export default function Dashboard() {
 
         {/* PRICE CHART */}
         <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-          <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 10 }}>PRICE — {ticker} CLOSE</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
+            {hasDemark && currentRiskLine && (
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
+              </div>
+            )}
+          </div>
           <ResponsiveContainer width="100%" height={180}>
-            <ComposedChart data={filtered} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+            <ComposedChart data={priceWithRisk} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={T.cyan} stopOpacity={0.3} />
@@ -437,6 +462,7 @@ export default function Dashboard() {
               <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                 labelStyle={{ color: T.sub }} />
               <Area type="monotone" dataKey="close" stroke={T.cyan} fill="url(#priceGrad)" strokeWidth={1.5} dot={false} name="Close" />
+              {hasDemark && <Line type="stepAfter" dataKey="riskLine" stroke={T.red} strokeWidth={1.5} strokeDasharray="6 3" dot={false} name="Risk Line" connectNulls={false} />}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -593,6 +619,7 @@ export default function Dashboard() {
                 ["Countdown 13s", `${demarkCountdown13Count}`, T.purple],
                 ["Total Signals", `${demarkSignals.length}`, T.blue],
                 ["Last Signal", lastDemarkSignal ? `${lastDemarkSignal.signal.replace(/_/g, " ")}` : "None", lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted],
+                ["Risk Line", currentRiskLine ? `$${currentRiskLine} (${currentRiskLineType})` : "Inactive", currentRiskLine ? T.red : T.muted],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, color: T.sub }}>{label}</span>

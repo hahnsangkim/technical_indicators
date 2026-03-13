@@ -158,6 +158,33 @@ app.get("/api/obv", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── TD Risk Line ────────────────────────────────────────────────────────────
+function calcRiskLine(rows, seqBars, type) {
+  if (!seqBars.length) return null;
+
+  // Find the extreme candle in the sequence
+  let extremeBar = seqBars[0];
+  for (const b of seqBars) {
+    if (type === "buy" && b.low < extremeBar.low) extremeBar = b;
+    if (type === "sell" && b.high > extremeBar.high) extremeBar = b;
+  }
+
+  // True Range of the extreme candle
+  const prevClose = extremeBar.idx > 0 ? rows[extremeBar.idx - 1].close : extremeBar.low;
+  const tr = Math.max(
+    extremeBar.high - extremeBar.low,
+    Math.abs(extremeBar.high - prevClose),
+    Math.abs(prevClose - extremeBar.low)
+  );
+
+  // Risk line
+  if (type === "buy") {
+    return { value: extremeBar.low - tr, type: "buy" };
+  } else {
+    return { value: extremeBar.high + tr, type: "sell" };
+  }
+}
+
 // ─── GET /api/demark?ticker=SPY ───────────────────────────────────────────────
 app.get("/api/demark", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
@@ -176,6 +203,12 @@ app.get("/api/demark", (req, res) => {
 
   // Store recent setup bar data for perfection check
   let setupBars = [];
+  // Track bar indices for setup/countdown sequences (for risk line)
+  let setupStartIdx = -1;
+  let countdownStartIdx = -1;
+
+  // Active risk line — persists until next signal or invalidation
+  let activeRiskLine = null; // { value, type: "buy"|"sell" }
 
   const data = rows.map((row, i) => {
     let setupComplete = false;
@@ -188,6 +221,7 @@ app.get("/api/demark", (req, res) => {
         date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
         setupCount: 0, setupType: null, countdownCount: 0, countdownType: null,
         setupComplete: false, countdownComplete: false, perfected: false, signal: null,
+        riskLine: null,
       };
     }
 
@@ -202,8 +236,9 @@ app.get("/api/demark", (req, res) => {
         setupType = "buy";
         setupCount = 1;
         setupBars = [];
+        setupStartIdx = i;
       }
-      setupBars.push({ high: row.high, low: row.low });
+      setupBars.push({ high: row.high, low: row.low, idx: i });
     } else if (row.close > cmp) {
       // Sell setup bar (bullish exhaustion — close > close[4 bars ago])
       if (setupType === "sell") {
@@ -212,8 +247,9 @@ app.get("/api/demark", (req, res) => {
         setupType = "sell";
         setupCount = 1;
         setupBars = [];
+        setupStartIdx = i;
       }
-      setupBars.push({ high: row.high, low: row.low });
+      setupBars.push({ high: row.high, low: row.low, idx: i });
     } else {
       // Equal — reset setup
       setupCount = 0;
@@ -237,10 +273,14 @@ app.get("/api/demark", (req, res) => {
 
       signal = setupType === "buy" ? "BUY_SETUP_9" : "SELL_SETUP_9";
 
+      // TD Risk Line for setup-9
+      activeRiskLine = calcRiskLine(rows, setupBars, setupType);
+
       // Start countdown
       countdownActive = true;
       countdownType = setupType;
       countdownCount = 0;
+      countdownStartIdx = i;
 
       // Reset setup
       setupCount = 0;
@@ -259,6 +299,14 @@ app.get("/api/demark", (req, res) => {
       if (countdownCount === 13) {
         countdownComplete = true;
         signal = countdownType === "buy" ? "BUY_COUNTDOWN_13" : "SELL_COUNTDOWN_13";
+
+        // TD Risk Line for countdown-13: use all bars from countdown start
+        const cdBars = [];
+        for (let j = countdownStartIdx; j <= i; j++) {
+          cdBars.push({ high: rows[j].high, low: rows[j].low, idx: j });
+        }
+        activeRiskLine = calcRiskLine(rows, cdBars, countdownType);
+
         countdownActive = false;
         countdownCount = 0;
         countdownType = null;
@@ -269,6 +317,15 @@ app.get("/api/demark", (req, res) => {
         countdownActive = false;
         countdownCount = 0;
         countdownType = null;
+      }
+    }
+
+    // Check if risk line is breached on close — invalidate
+    if (activeRiskLine) {
+      if (activeRiskLine.type === "buy" && row.close < activeRiskLine.value) {
+        activeRiskLine = null;
+      } else if (activeRiskLine.type === "sell" && row.close > activeRiskLine.value) {
+        activeRiskLine = null;
       }
     }
 
@@ -284,6 +341,8 @@ app.get("/api/demark", (req, res) => {
       countdownComplete,
       perfected,
       signal,
+      riskLine: activeRiskLine ? +activeRiskLine.value.toFixed(2) : null,
+      riskLineType: activeRiskLine ? activeRiskLine.type : null,
     };
   });
 
