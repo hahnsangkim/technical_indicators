@@ -158,6 +158,138 @@ app.get("/api/obv", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/demark?ticker=SPY ───────────────────────────────────────────────
+app.get("/api/demark", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+
+  if (rows.length === 0) {
+    return res.json({ ticker, data: [] });
+  }
+
+  let setupCount = 0;   // positive = sell setup, negative = buy setup
+  let setupType = null;  // "buy" | "sell" | null
+  let countdownCount = 0;
+  let countdownType = null;
+  let countdownActive = false;
+
+  // Store recent setup bar data for perfection check
+  let setupBars = [];
+
+  const data = rows.map((row, i) => {
+    let setupComplete = false;
+    let countdownComplete = false;
+    let perfected = false;
+    let signal = null;
+
+    if (i < 4) {
+      return {
+        date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+        setupCount: 0, setupType: null, countdownCount: 0, countdownType: null,
+        setupComplete: false, countdownComplete: false, perfected: false, signal: null,
+      };
+    }
+
+    const cmp = rows[i - 4].close;
+
+    // --- TD Setup ---
+    if (row.close < cmp) {
+      // Buy setup bar (bearish exhaustion — close < close[4 bars ago])
+      if (setupType === "buy") {
+        setupCount++;
+      } else {
+        setupType = "buy";
+        setupCount = 1;
+        setupBars = [];
+      }
+      setupBars.push({ high: row.high, low: row.low });
+    } else if (row.close > cmp) {
+      // Sell setup bar (bullish exhaustion — close > close[4 bars ago])
+      if (setupType === "sell") {
+        setupCount++;
+      } else {
+        setupType = "sell";
+        setupCount = 1;
+        setupBars = [];
+      }
+      setupBars.push({ high: row.high, low: row.low });
+    } else {
+      // Equal — reset setup
+      setupCount = 0;
+      setupType = null;
+      setupBars = [];
+    }
+
+    // Check setup completion at 9
+    if (setupCount === 9) {
+      setupComplete = true;
+
+      // Perfection check
+      if (setupBars.length >= 9) {
+        const b6 = setupBars[5], b7 = setupBars[6], b8 = setupBars[7], b9 = setupBars[8];
+        if (setupType === "buy") {
+          perfected = (b8.low < b6.low && b8.low < b7.low) || (b9.low < b6.low && b9.low < b7.low);
+        } else {
+          perfected = (b8.high > b6.high && b8.high > b7.high) || (b9.high > b6.high && b9.high > b7.high);
+        }
+      }
+
+      signal = setupType === "buy" ? "BUY_SETUP_9" : "SELL_SETUP_9";
+
+      // Start countdown
+      countdownActive = true;
+      countdownType = setupType;
+      countdownCount = 0;
+
+      // Reset setup
+      setupCount = 0;
+      setupType = null;
+      setupBars = [];
+    }
+
+    // --- TD Countdown (non-consecutive) ---
+    if (countdownActive && i >= 2) {
+      if (countdownType === "buy" && row.close <= rows[i - 2].low) {
+        countdownCount++;
+      } else if (countdownType === "sell" && row.close >= rows[i - 2].high) {
+        countdownCount++;
+      }
+
+      if (countdownCount === 13) {
+        countdownComplete = true;
+        signal = countdownType === "buy" ? "BUY_COUNTDOWN_13" : "SELL_COUNTDOWN_13";
+        countdownActive = false;
+        countdownCount = 0;
+        countdownType = null;
+      }
+
+      // Invalidation: opposite setup completing cancels countdown
+      if (setupComplete && setupType !== countdownType) {
+        countdownActive = false;
+        countdownCount = 0;
+        countdownType = null;
+      }
+    }
+
+    return {
+      date: row.date,
+      close: +row.close.toFixed(2),
+      volume: Math.round(row.volume),
+      setupCount: setupType === "buy" ? -setupCount : setupCount,
+      setupType,
+      countdownCount: countdownActive ? countdownCount : 0,
+      countdownType: countdownActive ? countdownType : null,
+      setupComplete,
+      countdownComplete,
+      perfected,
+      signal,
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });

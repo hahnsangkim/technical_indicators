@@ -25,6 +25,7 @@ const T = {
 const INDICATORS = {
   eco: { label: "ECO", desc: "Enhanced Ergodic Candlestick Oscillator", color: T.cyan },
   obv: { label: "OBV", desc: "On-Balance Volume", color: T.purple },
+  demark: { label: "DeMark", desc: "TD Sequential (Setup 9 / Countdown 13)", color: T.gold },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ export default function Dashboard() {
   const [activeIndicators, setActiveIndicators] = useState(["eco"]);
   const [ecoData, setEcoData] = useState(null);
   const [obvData, setObvData] = useState(null);
+  const [demarkData, setDemarkData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -218,6 +220,16 @@ export default function Dashboard() {
       setObvData(null);
     }
 
+    if (activeIndicators.includes("demark")) {
+      promises.push(
+        fetch(`${API}/api/demark?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setDemarkData(res.data))
+      );
+    } else {
+      setDemarkData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -236,7 +248,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData;
+  const primaryData = ecoData || obvData || demarkData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -258,6 +270,13 @@ export default function Dashboard() {
     const n = map[range] || obvData.length;
     return obvData.slice(-n);
   }, [obvData, range]);
+
+  const filteredDemark = useMemo(() => {
+    if (!demarkData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": demarkData.length };
+    const n = map[range] || demarkData.length;
+    return demarkData.slice(-n);
+  }, [demarkData, range]);
 
   if (loading || !primaryData) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -303,6 +322,21 @@ export default function Dashboard() {
     }
   }
 
+  // DeMark stats
+  const hasDemark = activeIndicators.includes("demark") && filteredDemark.length > 0;
+  const demarkLatest = hasDemark ? filteredDemark[filteredDemark.length - 1] : null;
+  let demarkSignals = [], demarkSetup9Count = 0, demarkCountdown13Count = 0;
+  if (hasDemark) {
+    for (const d of filteredDemark) {
+      if (d.signal) {
+        demarkSignals.push(d);
+        if (d.signal.endsWith("SETUP_9")) demarkSetup9Count++;
+        if (d.signal.endsWith("COUNTDOWN_13")) demarkCountdown13Count++;
+      }
+    }
+  }
+  const lastDemarkSignal = demarkSignals.length > 0 ? demarkSignals[demarkSignals.length - 1] : null;
+
   // Combined signal badge
   const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : (hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : T.muted);
   const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : (hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : "—");
@@ -317,6 +351,13 @@ export default function Dashboard() {
   if (hasObv) {
     kpis.push({ label: "OBV", value: fmtVol(obvLatest.obv), color: T.purple, sub: `EMA: ${fmtVol(obvLatest.obvEma)}` });
     kpis.push({ label: "OBV TREND", value: obvTrend, color: obvTrend === "BULLISH" ? T.lime : T.red, sub: `vs EMA(20)` });
+  }
+  if (hasDemark) {
+    const setupVal = demarkLatest.setupCount === 0 ? "—" : `${demarkLatest.setupType === "sell" ? "S" : "B"} ${Math.abs(demarkLatest.setupCount)}`;
+    kpis.push({ label: "TD SETUP", value: setupVal, color: T.gold, sub: demarkLatest.setupType ? `${demarkLatest.setupType} phase` : "inactive" });
+    const lastSigLabel = lastDemarkSignal ? lastDemarkSignal.signal.replace(/_/g, " ") : "None";
+    const lastSigColor = lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted;
+    kpis.push({ label: "LAST SIGNAL", value: lastSigLabel, color: lastSigColor, sub: lastDemarkSignal?.date || "—" });
   }
 
   return (
@@ -463,8 +504,46 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* DEMARK CHART */}
+        {hasDemark && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>TD SEQUENTIAL — SETUP &amp; COUNTDOWN</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Buy Setup</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Sell Setup</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Countdown</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredDemark} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredDemark.length / 6)} />
+                <YAxis yAxisId="setup" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
+                  domain={[-10, 10]} width={30} tickFormatter={v => Math.abs(v)} />
+                <YAxis yAxisId="countdown" orientation="right" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
+                  domain={[0, 14]} width={30} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }}
+                  formatter={(v, name) => {
+                    if (name === "Setup") return [Math.abs(v), v < 0 ? "Buy Setup" : v > 0 ? "Sell Setup" : "—"];
+                    return [v, name];
+                  }} />
+                <ReferenceLine yAxisId="setup" y={0} stroke={T.border} strokeDasharray="3 3" />
+                <Bar yAxisId="setup" dataKey="setupCount" name="Setup"
+                  shape={({ x, y, width, height, payload }) => {
+                    const c = payload.setupCount < 0 ? T.lime : payload.setupCount > 0 ? T.red : "transparent";
+                    const opacity = payload.setupComplete ? 1 : 0.5;
+                    return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={opacity} rx={1} />;
+                  }} />
+                <Line yAxisId="countdown" type="stepAfter" dataKey="countdownCount" stroke={T.gold} strokeWidth={2} dot={false} name="Countdown" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: hasEco && hasObv ? "1fr 1fr" : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -495,6 +574,25 @@ export default function Dashboard() {
                 ["OBV Low", fmtVol(obvMin), T.red],
                 ["Trend", obvTrend, obvTrend === "BULLISH" ? T.lime : T.red],
                 ["OBV vs EMA", fmtVol(obvLatest.obv - obvLatest.obvEma), obvLatest.obv > obvLatest.obvEma ? T.lime : T.red],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasDemark && (
+            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>DEMARK STATISTICS</div>
+              {[
+                ["Method", "TD Sequential", T.gold],
+                ["Setup Phase", demarkLatest.setupType ? `${demarkLatest.setupType} (${Math.abs(demarkLatest.setupCount)}/9)` : "Inactive", demarkLatest.setupType === "buy" ? T.lime : demarkLatest.setupType === "sell" ? T.red : T.muted],
+                ["Countdown", demarkLatest.countdownType ? `${demarkLatest.countdownType} (${demarkLatest.countdownCount}/13)` : "Inactive", T.gold],
+                ["Setup 9 Signals", `${demarkSetup9Count}`, T.cyan],
+                ["Countdown 13s", `${demarkCountdown13Count}`, T.purple],
+                ["Total Signals", `${demarkSignals.length}`, T.blue],
+                ["Last Signal", lastDemarkSignal ? `${lastDemarkSignal.signal.replace(/_/g, " ")}` : "None", lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
