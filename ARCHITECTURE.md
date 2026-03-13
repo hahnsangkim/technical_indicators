@@ -29,13 +29,15 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 |-----------|---------|
 | `Dashboard` | Main layout, state management, chart rendering |
 | `TickerSearch` | Searchable dropdown for 487 S&P 500 tickers |
-| `IndicatorMenu` | Multi-select indicator toggle (ECO, OBV) |
+| `IndicatorMenu` | Multi-select indicator toggle (ECO, OBV, DeMark) |
 
 ### Key Patterns
 
 - **AbortController** on every fetch to cancel stale requests on rapid ticker changes
 - **useMemo** for filtered data (3M/6M/1Y/ALL range slicing)
-- **Dynamic KPI cards** — grid adapts based on active indicators
+- **Hooks before returns** — all `useMemo` calls placed before conditional early returns to satisfy React hooks ordering rules
+- **Dynamic KPI cards** — grid adapts based on active indicators (up to 8 cards with all indicators)
+- **Risk line overlay** — DeMark risk line merged into price chart data via date lookup
 - **Min/max via loops** — avoids `Math.max(...largeArray)` stack overflow
 
 ## Backend
@@ -52,6 +54,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | `/api/tickers` | GET | Returns sorted list of all ticker symbols |
 | `/api/eco?ticker=SPY` | GET | ECO indicator data for given ticker |
 | `/api/obv?ticker=SPY` | GET | OBV indicator data for given ticker |
+| `/api/demark?ticker=SPY` | GET | DeMark TD Sequential with risk line |
 | `/api/health` | GET | Health check with row count |
 
 ### Input Validation
@@ -101,6 +104,30 @@ If close == prevClose: OBV unchanged
 Signal = EMA(20) of OBV
 ```
 
+### DeMark (TD Sequential)
+
+Trend exhaustion indicator with two phases and a risk line.
+
+```
+Phase 1 — TD Setup (the "9"):
+  Buy Setup:  9 consecutive closes < close[4 bars ago]
+  Sell Setup: 9 consecutive closes > close[4 bars ago]
+  Perfection: bar 8 or 9 extreme exceeds bars 6 and 7
+
+Phase 2 — TD Countdown (the "13"):
+  Triggered after a completed setup. Non-consecutive.
+  Buy:  close <= low[2 bars ago]
+  Sell: close >= high[2 bars ago]
+  Invalidation: opposite setup completes → countdown canceled
+
+TD Risk Line (stop-loss):
+  1. Find extreme candle in the setup/countdown sequence
+  2. True Range = max(H-L, |H-prevClose|, |prevClose-L|)
+  3. Buy Risk  = Extreme Low  - True Range
+  4. Sell Risk = Extreme High + True Range
+  Invalidated on close beyond the risk line
+```
+
 ## Environment Variables
 
 | Variable | Location | Value |
@@ -136,7 +163,9 @@ technical_indicators/
 │   └── sp500spy_prices.csv  # Source data
 ├── strategies/              # Not committed (gitignored)
 │   ├── ECO.md
-│   └── OBV.md
+│   ├── OBV.md
+│   ├── DeMark.md
+│   └── TDRiskLine.md
 ├── package.json             # Frontend deps
 ├── .env                     # Dev API URL
 └── .env.production          # Prod API URL
