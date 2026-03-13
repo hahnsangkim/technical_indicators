@@ -1,4 +1,8 @@
-import { useState, useCallback } from "react";
+"use client";
+import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  ComposedChart, Area, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
+} from "recharts";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -8,526 +12,499 @@ const T = {
   border: "#1a2236",
   borderHi: "#2a3d5e",
   lime: "#39ff8a",
-  limeD: "#1a7a42",
   red: "#ff3a5c",
-  redD: "#7a1a2a",
   gold: "#f5c842",
   blue: "#4a9eff",
-  purple: "#b06aff",
   cyan: "#00e5cc",
+  purple: "#b06aff",
   text: "#d0dff5",
   sub: "#7a90b0",
   muted: "#3a4d6a",
-  off: "#ffffff08",
 };
 
-// ─── MATH ─────────────────────────────────────────────────────────────────────
-const emaK = n => 2 / (n + 1);
+const INDICATORS = {
+  eco: { label: "ECO", desc: "Enhanced Ergodic Candlestick Oscillator", color: T.cyan },
+  obv: { label: "OBV", desc: "On-Balance Volume", color: T.purple },
+};
 
-function calcEMA(val, prev, k) { return val * k + prev * (1 - k); }
+// ─── API ──────────────────────────────────────────────────────────────────────
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-function calcDEMA(val, ema1, ema2, k) {
-  const newEma1 = calcEMA(val, ema1, k);
-  const newEma2 = calcEMA(newEma1, ema2, k);
-  return { ema1: newEma1, ema2: newEma2, dema: 2 * newEma1 - newEma2 };
-}
+// ─── TICKER SEARCH ────────────────────────────────────────────────────────────
+function TickerSearch({ tickers, selected, onSelect }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
-// ─── REUSABLE COMPONENTS ──────────────────────────────────────────────────────
-function Slider({ label, value, min, max, step = 0.01, onChange, color = T.blue, unit = "" }) {
-  const pct = ((value - min) / (max - min)) * 100;
+  const results = useMemo(() => {
+    if (!query) return tickers.slice(0, 30);
+    const q = query.toUpperCase();
+    return tickers.filter(t => t.includes(q)).slice(0, 30);
+  }, [query, tickers]);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   return (
-    <div style={{ marginBottom: 11 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-        <span style={{ fontSize: 10, color: T.sub, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
-        <span style={{ fontSize: 12, color, fontFamily: "monospace", fontWeight: 700 }}>{typeof value === "number" ? value.toFixed(2) : value}{unit}</span>
-      </div>
-      <div style={{ position: "relative", height: 5, background: T.muted, borderRadius: 3 }}>
-        <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: color, borderRadius: 3, boxShadow: `0 0 6px ${color}66`, transition: "width 0.1s" }} />
-        <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))}
-          style={{ position: "absolute", top: -5, left: 0, width: "100%", height: 15, opacity: 0, cursor: "pointer", margin: 0, padding: 0 }} />
-      </div>
-    </div>
-  );
-}
-
-function Toggle({ label, active, color, onClick, desc }) {
-  return (
-    <button onClick={onClick} style={{
-      display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
-      background: active ? `${color}14` : T.panel,
-      border: `1px solid ${active ? color : T.border}`,
-      borderRadius: 8, cursor: "pointer", width: "100%", textAlign: "left",
-      transition: "all 0.2s ease", boxShadow: active ? `0 0 14px ${color}22` : "none"
-    }}>
-      <div style={{
-        width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 1,
-        background: active ? color : T.muted,
-        boxShadow: active ? `0 0 8px ${color}` : "none",
-        transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center"
+    <div ref={ref} style={{ position: "relative" }}>
+      <div onClick={() => setOpen(!open)} style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "6px 12px", borderRadius: 6,
+        background: T.panel, border: `1px solid ${T.borderHi}`,
+        cursor: "pointer", minWidth: 140,
       }}>
-        {active && <span style={{ color: "#000", fontSize: 10, fontWeight: 900 }}>✓</span>}
+        <span style={{ fontSize: 16, fontWeight: 800, color: T.cyan, fontFamily: "monospace" }}>{selected}</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" style={{ marginLeft: "auto", opacity: 0.5 }}>
+          <path d="M1 1l4 4 4-4" stroke={T.sub} strokeWidth="1.5" fill="none" />
+        </svg>
       </div>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: active ? color : T.sub, letterSpacing: "0.04em" }}>{label}</div>
-        <div style={{ fontSize: 10, color: T.muted, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
-      </div>
-    </button>
-  );
-}
-
-function ValueRow({ label, orig, enhanced, deltaColor }) {
-  const delta = enhanced - orig;
-  const absDelta = Math.abs(delta);
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 0.8fr", gap: 6, marginBottom: 7, alignItems: "center" }}>
-      <span style={{ fontSize: 10, color: T.sub, letterSpacing: "0.06em" }}>{label}</span>
-      <span style={{ fontSize: 12, fontFamily: "monospace", color: T.blue, textAlign: "right" }}>{orig.toFixed(4)}</span>
-      <span style={{ fontSize: 12, fontFamily: "monospace", color: T.cyan, textAlign: "right" }}>{enhanced.toFixed(4)}</span>
-      <span style={{ fontSize: 11, fontFamily: "monospace", color: delta > 0.001 ? T.lime : delta < -0.001 ? T.red : T.muted, textAlign: "right", fontWeight: 700 }}>
-        {delta > 0.001 ? "+" : ""}{delta.toFixed(3)}
-      </span>
-    </div>
-  );
-}
-
-function BigNumber({ label, value, color, sub }) {
-  return (
-    <div style={{ textAlign: "center", padding: "12px 8px", background: `${color}0a`, borderRadius: 8, border: `1px solid ${color}25` }}>
-      <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.14em", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: "monospace", letterSpacing: "-0.03em", lineHeight: 1 }}>
-        {value.toFixed(2)}
-      </div>
-      {sub && <div style={{ fontSize: 9, color: T.sub, marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function SignalBadge({ eco, signal, label }) {
-  const bull = eco > signal;
-  const color = bull ? T.lime : T.red;
-  return (
-    <div style={{
-      padding: "8px 12px", borderRadius: 6,
-      background: `${color}12`, border: `1px solid ${color}33`,
-      display: "flex", alignItems: "center", justifyContent: "space-between"
-    }}>
-      <div>
-        <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.1em" }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 800, color, marginTop: 2 }}>
-          {bull ? "▲ BULLISH" : "▼ BEARISH"}
-        </div>
-      </div>
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontSize: 9, color: T.muted }}>ECO − SIG</div>
-        <div style={{ fontSize: 13, fontFamily: "monospace", color, fontWeight: 800 }}>
-          {(eco - signal) > 0 ? "+" : ""}{(eco - signal).toFixed(2)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DeltaMeter({ orig, enhanced }) {
-  const delta = enhanced - orig;
-  const maxDelta = Math.max(Math.abs(delta), 5);
-  const pct = Math.min(Math.abs(delta) / maxDelta * 100, 100);
-  const color = Math.abs(delta) < 1 ? T.gold : delta > 0 ? T.lime : T.red;
-  return (
-    <div style={{ padding: "14px 16px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-      <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.12em", marginBottom: 10 }}>ECO DELTA (Enhanced − Original)</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ flex: 1, height: 8, background: T.muted, borderRadius: 4, overflow: "hidden" }}>
-          <div style={{
-            height: "100%", width: `${pct}%`, borderRadius: 4,
-            background: color, boxShadow: `0 0 10px ${color}88`,
-            transition: "all 0.4s ease"
-          }} />
-        </div>
-        <span style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "monospace", minWidth: 70, textAlign: "right" }}>
-          {delta > 0 ? "+" : ""}{delta.toFixed(3)}
-        </span>
-      </div>
-      <div style={{ fontSize: 10, color: T.sub, marginTop: 8 }}>
-        {Math.abs(delta) < 0.5 ? "Minimal difference — improvements have low impact on this candle's conditions"
-          : Math.abs(delta) < 5 ? "Moderate shift — improvements are meaningfully altering the signal"
-          : "Significant divergence — enhancements producing substantially different reading"}
-      </div>
-    </div>
-  );
-}
-
-function RegimeFlag({ adx, trendFilter, useRegime, trueRange, range }) {
-  if (!useRegime) return null;
-  const trending = adx > 25;
-  const color = trending ? T.red : T.lime;
-  return (
-    <div style={{
-      padding: "8px 12px", borderRadius: 6, marginTop: 8,
-      background: `${color}10`, border: `1px solid ${color}30`
-    }}>
-      <div style={{ fontSize: 10, color: T.muted, marginBottom: 3 }}>REGIME FILTER (ADX = {adx.toFixed(1)})</div>
-      <div style={{ fontSize: 12, fontWeight: 700, color }}>
-        {trending
-          ? "⚠ TRENDING MARKET — ECO signals suppressed. Use trend-following only."
-          : "✓ RANGING MARKET — ECO signals are valid in this regime."}
-      </div>
-      {trendFilter && (
-        <div style={{ fontSize: 10, color: T.sub, marginTop: 4 }}>
-          200-EMA trend filter active: only take signals in trend direction
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, marginTop: 4,
+          width: 220, maxHeight: 340, background: T.surface,
+          border: `1px solid ${T.borderHi}`, borderRadius: 8,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.6)", zIndex: 100,
+          display: "flex", flexDirection: "column", overflow: "hidden",
+        }}>
+          <div style={{ padding: "8px 10px", borderBottom: `1px solid ${T.border}` }}>
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Search ticker…"
+              style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: `1px solid ${T.border}`, background: T.panel, color: T.text, fontSize: 12, fontFamily: "monospace", outline: "none" }}
+              onFocus={e => e.target.style.borderColor = T.cyan}
+              onBlur={e => e.target.style.borderColor = T.border} />
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {results.length === 0 && <div style={{ padding: "14px", textAlign: "center", color: T.muted, fontSize: 11 }}>No matches</div>}
+            {results.map(t => (
+              <button key={t} onClick={() => { onSelect(t); setOpen(false); setQuery(""); }}
+                style={{ display: "block", width: "100%", padding: "8px 14px", background: t === selected ? `${T.cyan}15` : "transparent", border: "none", borderBottom: `1px solid ${T.border}`, color: t === selected ? T.cyan : T.text, fontSize: 12, fontFamily: "monospace", fontWeight: t === selected ? 700 : 400, cursor: "pointer", textAlign: "left" }}
+                onMouseEnter={e => { if (t !== selected) e.target.style.background = `${T.blue}12`; }}
+                onMouseLeave={e => { if (t !== selected) e.target.style.background = "transparent"; }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <div style={{ padding: "6px 10px", borderTop: `1px solid ${T.border}`, fontSize: 9, color: T.muted, textAlign: "center" }}>
+            {tickers.length} tickers available
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function ECOComparison() {
-  // Candle inputs
-  const [open, setOpen] = useState(150);
-  const [high, setHigh] = useState(155);
-  const [low, setLow] = useState(148);
-  const [close, setClose] = useState(153);
-  const [volume, setVolume] = useState(1000000);
-  const [prevClose, setPrevClose] = useState(149);
+// ─── INDICATOR MENU ───────────────────────────────────────────────────────────
+function IndicatorMenu({ active, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
-  // Prior EMA state (shared starting point)
-  const [pE25c, setPE25c] = useState(1.5);
-  const [pE25r, setPE25r] = useState(6.0);
-  const [pE13n, setPE13n] = useState(1.2);
-  const [pE13d, setPE13d] = useState(5.5);
-  const [pSig, setPSig] = useState(19.0);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  // DEMA prior state (for enhanced)
-  const [pD25c2, setPD25c2] = useState(1.4);
-  const [pD25r2, setPD25r2] = useState(5.8);
-  const [pD13n2, setPD13n2] = useState(1.1);
-  const [pD13d2, setPD13d2] = useState(5.3);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button onClick={() => setOpen(!open)} style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "6px 12px", borderRadius: 6,
+        background: T.panel, border: `1px solid ${T.borderHi}`,
+        cursor: "pointer", color: T.text, fontSize: 11, fontWeight: 600,
+        letterSpacing: "0.06em",
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.sub} strokeWidth="2">
+          <path d="M3 3v18h18" /><path d="M7 16l4-8 4 4 6-10" />
+        </svg>
+        Indicators
+        <span style={{
+          background: T.cyan, color: "#000", fontSize: 9, fontWeight: 800,
+          borderRadius: 4, padding: "1px 5px", marginLeft: 2,
+        }}>{active.length}</span>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", right: 0, marginTop: 4,
+          width: 260, background: T.surface,
+          border: `1px solid ${T.borderHi}`, borderRadius: 8,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.6)", zIndex: 100,
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: "8px 12px", borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.muted, letterSpacing: "0.14em" }}>
+            SELECT INDICATORS
+          </div>
+          {Object.entries(INDICATORS).map(([key, ind]) => {
+            const isActive = active.includes(key);
+            return (
+              <button key={key} onClick={() => onToggle(key)} style={{
+                display: "flex", alignItems: "center", gap: 10, width: "100%",
+                padding: "10px 12px", background: isActive ? `${ind.color}10` : "transparent",
+                border: "none", borderBottom: `1px solid ${T.border}`,
+                cursor: "pointer", textAlign: "left",
+              }}>
+                <div style={{
+                  width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                  background: isActive ? ind.color : T.muted,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: isActive ? `0 0 8px ${ind.color}` : "none",
+                }}>
+                  {isActive && <span style={{ color: "#000", fontSize: 10, fontWeight: 900 }}>&#10003;</span>}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? ind.color : T.sub }}>{ind.label}</div>
+                  <div style={{ fontSize: 9, color: T.muted, marginTop: 1 }}>{ind.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
-  // ADX proxy input
-  const [adx, setAdx] = useState(18);
-  const [trendFilter, setTrendFilter] = useState(false);
+// ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
+function fmtVol(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(1) + "B";
+  if (abs >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (abs >= 1e3) return (n / 1e3).toFixed(0) + "K";
+  return n.toString();
+}
 
-  // Feature toggles
-  const [useDEMA, setUseDEMA] = useState(true);
-  const [useVolume, setUseVolume] = useState(true);
-  const [useTrueRange, setUseTrueRange] = useState(true);
-  const [useRegime, setUseRegime] = useState(true);
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+export default function Dashboard() {
+  const [tickers, setTickers] = useState([]);
+  const [ticker, setTicker] = useState("SPY");
+  const [activeIndicators, setActiveIndicators] = useState(["eco"]);
+  const [ecoData, setEcoData] = useState(null);
+  const [obvData, setObvData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState("1Y");
 
-  const [tab, setTab] = useState("compare"); // compare | detail | regime
+  useEffect(() => {
+    fetch(`${API}/api/tickers`)
+      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(setTickers)
+      .catch(err => console.error("Failed to load tickers:", err));
+  }, []);
 
-  // ── ORIGINAL ECO ─────────────────────────────────────────────
-  const origChange = close - open;
-  const origRange = Math.max(high - low, 0.001);
-  const k25 = emaK(25), k13 = emaK(13), k8 = emaK(8);
+  // Fetch indicator data based on active selections
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    const promises = [];
 
-  const origE25c = calcEMA(origChange, pE25c, k25);
-  const origE25r = calcEMA(origRange, pE25r, k25);
-  const origNum = calcEMA(origE25c, pE13n, k13);
-  const origDen = calcEMA(origE25r, pE13d, k13);
-  const origECO = (origNum / origDen) * 100;
-  const origSignal = calcEMA(origECO, pSig, k8);
+    if (activeIndicators.includes("eco")) {
+      promises.push(
+        fetch(`${API}/api/eco?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setEcoData(res.data))
+      );
+    } else {
+      setEcoData(null);
+    }
 
-  // ── ENHANCED ECO ─────────────────────────────────────────────
-  const volNorm = volume / 1000000;
-  const enhChange = useVolume ? (close - open) * volNorm : (close - open);
-  const trueRange = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
-  const enhRange = useTrueRange ? Math.max(trueRange, 0.001) : Math.max(high - low, 0.001);
+    if (activeIndicators.includes("obv")) {
+      promises.push(
+        fetch(`${API}/api/obv?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setObvData(res.data))
+      );
+    } else {
+      setObvData(null);
+    }
 
-  let enhNum, enhDen, enhECO, enhSignal;
+    Promise.all(promises)
+      .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
+      .finally(() => setLoading(false));
 
-  if (useDEMA) {
-    const d25c = calcDEMA(enhChange, pE25c, pD25c2, k25);
-    const d25r = calcDEMA(enhRange, pE25r, pD25r2, k25);
-    const d13n = calcDEMA(d25c.dema, pE13n, pD13n2, k13);
-    const d13d = calcDEMA(d25r.dema, pE13d, pD13d2, k13);
-    enhNum = d13n.dema;
-    enhDen = d13d.dema;
-  } else {
-    const eE25c = calcEMA(enhChange, pE25c, k25);
-    const eE25r = calcEMA(enhRange, pE25r, k25);
-    enhNum = calcEMA(eE25c, pE13n, k13);
-    enhDen = calcEMA(eE25r, pE13d, k13);
+    return () => controller.abort();
+  }, [ticker, activeIndicators]);
+
+  const toggleIndicator = (key) => {
+    setActiveIndicators(prev => {
+      if (prev.includes(key)) {
+        if (prev.length === 1) return prev; // keep at least one
+        return prev.filter(k => k !== key);
+      }
+      return [...prev, key];
+    });
+  };
+
+  // Use whichever dataset is available for price chart / range filtering
+  const primaryData = ecoData || obvData;
+
+  const filtered = useMemo(() => {
+    if (!primaryData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": primaryData.length };
+    const n = map[range] || primaryData.length;
+    return primaryData.slice(-n);
+  }, [primaryData, range]);
+
+  const filteredEco = useMemo(() => {
+    if (!ecoData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": ecoData.length };
+    const n = map[range] || ecoData.length;
+    return ecoData.slice(-n);
+  }, [ecoData, range]);
+
+  const filteredObv = useMemo(() => {
+    if (!obvData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": obvData.length };
+    const n = map[range] || obvData.length;
+    return obvData.slice(-n);
+  }, [obvData, range]);
+
+  if (loading || !primaryData) return (
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: T.cyan, fontSize: 14, fontFamily: "monospace" }}>Loading {ticker} data…</div>
+    </div>
+  );
+
+  if (primaryData.length === 0) return (
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+      <div style={{ color: T.red, fontSize: 14, fontFamily: "monospace" }}>No data found for {ticker}</div>
+      {tickers.length > 0 && <TickerSearch tickers={tickers} selected={ticker} onSelect={setTicker} />}
+    </div>
+  );
+
+  const latest = filtered[filtered.length - 1];
+
+  // ECO stats
+  const hasEco = activeIndicators.includes("eco") && filteredEco.length > 0;
+  const ecoLatest = hasEco ? filteredEco[filteredEco.length - 1] : null;
+  let ecoBull = false, ecoCrossovers = 0, ecoBullBars = 0, ecoBullPct = "0", ecoMax = -Infinity, ecoMin = Infinity;
+  if (hasEco) {
+    ecoBull = ecoLatest.eco > ecoLatest.signal;
+    for (const d of filteredEco) {
+      if (d.eco > ecoMax) ecoMax = d.eco;
+      if (d.eco < ecoMin) ecoMin = d.eco;
+      if (d.eco > d.signal) ecoBullBars++;
+    }
+    ecoBullPct = ((ecoBullBars / filteredEco.length) * 100).toFixed(0);
+    for (let i = 1; i < filteredEco.length; i++) {
+      if ((filteredEco[i - 1].eco > filteredEco[i - 1].signal) !== (filteredEco[i].eco > filteredEco[i].signal)) ecoCrossovers++;
+    }
   }
 
-  enhECO = (enhNum / Math.max(Math.abs(enhDen), 0.0001)) * 100;
-  if (useVolume) enhECO = enhECO; // volume already in numerator
-  enhSignal = calcEMA(enhECO, pSig, k8);
+  // OBV stats
+  const hasObv = activeIndicators.includes("obv") && filteredObv.length > 0;
+  const obvLatest = hasObv ? filteredObv[filteredObv.length - 1] : null;
+  let obvTrend = "", obvMax = -Infinity, obvMin = Infinity;
+  if (hasObv) {
+    obvTrend = obvLatest.obv > obvLatest.obvEma ? "BULLISH" : "BEARISH";
+    for (const d of filteredObv) {
+      if (d.obv > obvMax) obvMax = d.obv;
+      if (d.obv < obvMin) obvMin = d.obv;
+    }
+  }
 
-  const regimeSuppressed = useRegime && adx > 25;
-  const lagReduction = useDEMA ? "~45%" : "0%";
+  // Combined signal badge
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : (hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : T.muted);
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : (hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : "—");
+
+  // KPI cards
+  const kpis = [];
+  kpis.push({ label: "CLOSE", value: `$${latest.close.toFixed(2)}`, color: T.text, sub: latest.date });
+  if (hasEco) {
+    kpis.push({ label: "ECO", value: ecoLatest.eco.toFixed(2), color: T.cyan, sub: `Signal: ${ecoLatest.signal.toFixed(2)}` });
+    kpis.push({ label: "ECO HIST", value: ecoLatest.histogram.toFixed(2), color: ecoLatest.histogram > 0 ? T.lime : T.red, sub: `${ecoCrossovers} crossovers` });
+  }
+  if (hasObv) {
+    kpis.push({ label: "OBV", value: fmtVol(obvLatest.obv), color: T.purple, sub: `EMA: ${fmtVol(obvLatest.obvEma)}` });
+    kpis.push({ label: "OBV TREND", value: obvTrend, color: obvTrend === "BULLISH" ? T.lime : T.red, sub: `vs EMA(20)` });
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", color: T.text }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
         * { box-sizing: border-box; }
-        input[type=range] { -webkit-appearance: none; appearance: none; }
         ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: ${T.bg}; }
         ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 2px; }
       `}</style>
 
       {/* HEADER */}
-      <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${T.border}`, background: `${T.surface}ee`, backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.2em" }}>ERGODIC CANDLESTICK OSCILLATOR</div>
-            <h1 style={{ margin: "2px 0 0", fontSize: 22, fontWeight: 700, color: T.text, letterSpacing: "-0.01em" }}>
-              Original <span style={{ color: T.muted }}>vs</span>{" "}
-              <span style={{ color: T.cyan }}>Enhanced</span>
-            </h1>
+      <div style={{
+        padding: "18px 20px 14px", borderBottom: `1px solid ${T.border}`,
+        background: `${T.surface}ee`, backdropFilter: "blur(12px)",
+        position: "sticky", top: 0, zIndex: 20
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 1200, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.2em" }}>TECHNICAL INDICATORS</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+                {tickers.length > 0 && <TickerSearch tickers={tickers} selected={ticker} onSelect={setTicker} />}
+                <span style={{ color: T.muted, fontSize: 11 }}>{primaryData.length} bars</span>
+              </div>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {["compare", "detail", "regime"].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                padding: "6px 14px", borderRadius: 6, border: `1px solid ${tab === t ? T.cyan : T.border}`,
-                background: tab === t ? `${T.cyan}18` : "transparent",
-                color: tab === t ? T.cyan : T.sub, fontSize: 11, fontWeight: 700,
-                cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase",
-                transition: "all 0.2s"
-              }}>{t}</button>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <IndicatorMenu active={activeIndicators} onToggle={toggleIndicator} />
+            {/* Signal badge */}
+            <div style={{ padding: "6px 14px", borderRadius: 6, background: `${sigColor}15`, border: `1px solid ${sigColor}40` }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: sigColor }}>{sigLabel}</span>
+            </div>
+            {/* Range buttons */}
+            <div style={{ display: "flex", gap: 4 }}>
+              {["3M", "6M", "1Y", "ALL"].map(r => (
+                <button key={r} onClick={() => setRange(r)} style={{
+                  padding: "5px 10px", borderRadius: 5, border: `1px solid ${range === r ? T.cyan : T.border}`,
+                  background: range === r ? `${T.cyan}18` : "transparent",
+                  color: range === r ? T.cyan : T.sub, fontSize: 10, fontWeight: 700,
+                  cursor: "pointer", letterSpacing: "0.08em"
+                }}>{r}</button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ padding: "16px", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "16px", maxWidth: 1200, margin: "0 auto" }}>
 
-        {/* IMPROVEMENT TOGGLES */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.15em", marginBottom: 10 }}>ACTIVE ENHANCEMENTS</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-            <Toggle label="DEMA Smoothing" color={T.cyan} active={useDEMA} onClick={() => setUseDEMA(v => !v)}
-              desc="Reduces lag ~45% via error correction" />
-            <Toggle label="Volume-Weighted" color={T.purple} active={useVolume} onClick={() => setUseVolume(v => !v)}
-              desc="Scales Change by normalized volume" />
-            <Toggle label="True Range" color={T.gold} active={useTrueRange} onClick={() => setUseTrueRange(v => !v)}
-              desc="Accounts for overnight gaps" />
-            <Toggle label="Regime Filter" color={T.lime} active={useRegime} onClick={() => setUseRegime(v => !v)}
-              desc="ADX gate suppresses bad-regime signals" />
-          </div>
+        {/* KPI CARDS */}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${kpis.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
+          {kpis.map(({ label, value, color, sub }) => (
+            <div key={label} style={{ padding: "12px 14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.14em", marginBottom: 6 }}>{label}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "-0.03em", lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: 9, color: T.sub, marginTop: 5 }}>{sub}</div>
+            </div>
+          ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 14 }}>
-
-          {/* LEFT COLUMN — INPUTS */}
-          <div>
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>TODAY'S CANDLE</div>
-              <Slider label="Open" value={open} min={100} max={200} step={0.5} onChange={v => setOpen(v)} color="#8ab4f8" />
-              <Slider label="High" value={high} min={Math.max(open, close)} max={220} step={0.5} onChange={v => setHigh(v)} color={T.lime} />
-              <Slider label="Low" value={low} min={80} max={Math.min(open, close)} step={0.5} onChange={v => setLow(v)} color={T.red} />
-              <Slider label="Close" value={close} min={100} max={200} step={0.5} onChange={v => setClose(v)} color={T.gold} />
-              <Slider label="Prev Close" value={prevClose} min={100} max={200} step={0.5} onChange={setPrevClose} color={T.sub} />
-              <Slider label="Volume (M)" value={volume} min={100000} max={5000000} step={50000} onChange={setVolume} color={T.purple} unit="M" />
-            </div>
-
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>PRIOR EMA STATE</div>
-              <Slider label="Prev EMA₂₅(Change)" value={pE25c} min={-10} max={10} onChange={setPE25c} />
-              <Slider label="Prev EMA₂₅(Range)" value={pE25r} min={0.5} max={20} onChange={setPE25r} color={T.blue} />
-              <Slider label="Prev EMA₁₃(Num)" value={pE13n} min={-10} max={10} onChange={setPE13n} />
-              <Slider label="Prev EMA₁₃(Den)" value={pE13d} min={0.5} max={20} onChange={setPE13d} color={T.blue} />
-              <Slider label="Prev Signal" value={pSig} min={-100} max={100} onChange={setPSig} color={T.gold} />
-            </div>
-
-            {useRegime && (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>REGIME INPUTS</div>
-                <Slider label="ADX (proxy)" value={adx} min={0} max={60} step={0.5} onChange={setAdx} color={T.lime} />
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, cursor: "pointer" }} onClick={() => setTrendFilter(v => !v)}>
-                  <div style={{ width: 14, height: 14, borderRadius: 3, background: trendFilter ? T.lime : T.muted, flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, color: T.sub }}>200-EMA Trend Direction Filter</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT COLUMN — OUTPUT */}
-          <div>
-            {tab === "compare" && (
-              <div>
-                {/* Big numbers */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-                  <BigNumber label="ORIGINAL ECO" value={origECO} color={T.blue} sub={`Signal: ${origSignal.toFixed(2)}`} />
-                  <BigNumber label="ENHANCED ECO" value={enhECO} color={T.cyan} sub={`Signal: ${enhSignal.toFixed(2)}`} />
-                  <div style={{ padding: "12px 8px", background: T.panel, borderRadius: 8, border: `1px solid ${T.border}`, textAlign: "center" }}>
-                    <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.14em", marginBottom: 4 }}>DELTA</div>
-                    <div style={{ fontSize: 26, fontWeight: 800, fontFamily: "monospace", color: (enhECO - origECO) > 0 ? T.lime : T.red, letterSpacing: "-0.03em" }}>
-                      {(enhECO - origECO) > 0 ? "+" : ""}{(enhECO - origECO).toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: 9, color: T.sub, marginTop: 4 }}>
-                      {Math.abs(enhECO - origECO) < 1 ? "≈ No change" : Math.abs(enhECO - origECO) < 5 ? "Moderate shift" : "Significant divergence"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Signal badges */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                  <SignalBadge eco={origECO} signal={origSignal} label="ORIGINAL SIGNAL STATE" />
-                  <div style={{ position: "relative" }}>
-                    <SignalBadge eco={enhECO} signal={enhSignal} label="ENHANCED SIGNAL STATE" />
-                    {regimeSuppressed && (
-                      <div style={{
-                        position: "absolute", inset: 0, borderRadius: 6,
-                        background: `${T.bg}cc`, backdropFilter: "blur(4px)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        border: `1px solid ${T.red}44`
-                      }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: T.red }}>⚠ SUPPRESSED — TRENDING REGIME</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <DeltaMeter orig={origECO} enhanced={enhECO} />
-
-                {/* Comparison table */}
-                <div style={{ padding: "14px 16px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginTop: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 0.8fr", gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.1em" }}>METRIC</span>
-                    <span style={{ fontSize: 9, color: T.blue, letterSpacing: "0.1em", textAlign: "right" }}>ORIGINAL</span>
-                    <span style={{ fontSize: 9, color: T.cyan, letterSpacing: "0.1em", textAlign: "right" }}>ENHANCED</span>
-                    <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.1em", textAlign: "right" }}>DELTA</span>
-                  </div>
-                  <ValueRow label="Change" orig={origChange} enhanced={enhChange} />
-                  <ValueRow label="Range" orig={origRange} enhanced={enhRange} />
-                  <ValueRow label="Numerator" orig={origNum} enhanced={enhNum} />
-                  <ValueRow label="Denominator" orig={origDen} enhanced={enhDen} />
-                  <div style={{ height: 1, background: T.border, margin: "8px 0" }} />
-                  <ValueRow label="ECO" orig={origECO} enhanced={enhECO} />
-                  <ValueRow label="Signal" orig={origSignal} enhanced={enhSignal} />
-                </div>
-              </div>
-            )}
-
-            {tab === "detail" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {/* Original workings */}
-                <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.blue}33`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.blue, marginBottom: 12, letterSpacing: "0.08em" }}>◈ ORIGINAL ECO — WORKINGS</div>
-                  {[
-                    ["Change = C − O", origChange, T.text],
-                    ["Range = H − L", origRange, T.text],
-                    ["EMA₂₅(Change)", origE25c, T.blue],
-                    ["EMA₂₅(Range)", origE25r, T.blue],
-                    ["Numerator (EMA₁₃)", origNum, T.lime],
-                    ["Denominator (EMA₁₃)", origDen, T.gold],
-                    ["ECO = N/D × 100", origECO, T.blue],
-                    ["Signal = EMA₈(ECO)", origSignal, T.gold],
-                  ].map(([l, v, c]) => (
-                    <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{l}</span>
-                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: c }}>{v.toFixed(4)}</span>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 10, color: T.muted, marginTop: 4 }}>Smoother: plain EMA · Range: High−Low</div>
-                </div>
-
-                {/* Enhanced workings */}
-                <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.cyan}33`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.cyan, marginBottom: 12, letterSpacing: "0.08em" }}>◈ ENHANCED ECO — WORKINGS</div>
-                  {[
-                    [`Change ${useVolume ? "(vol-wtd)" : ""}`, enhChange, T.text],
-                    [`Range ${useTrueRange ? "(True)" : ""}`, enhRange, T.text],
-                    [useDEMA ? "DEMA₂₅(Change)" : "EMA₂₅(Change)", enhNum, T.cyan],
-                    [useDEMA ? "DEMA₁₃(Num)" : "EMA₁₃(Num)", enhNum, T.lime],
-                    ["Denominator", enhDen, T.gold],
-                    ["ECO = N/D × 100", enhECO, T.cyan],
-                    ["Signal = EMA₈(ECO)", enhSignal, T.gold],
-                  ].map(([l, v, c]) => (
-                    <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{l}</span>
-                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: c }}>{v.toFixed(4)}</span>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 10, color: T.muted, marginTop: 4 }}>
-                    {useDEMA ? "✓ DEMA lag reduction" : "EMA"} · {useTrueRange ? "✓ True Range" : "H−L"} · {useVolume ? "✓ Vol-weighted" : "unweighted"}
-                  </div>
-                </div>
-
-                {/* Improvement summary */}
-                <div style={{ gridColumn: "1/-1", padding: "14px 16px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 10 }}>ACTIVE IMPROVEMENT EFFECTS</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                    {[
-                      { label: "DEMA Lag Cut", active: useDEMA, color: T.cyan, value: useDEMA ? "~45%" : "0%", desc: "Faster signal response" },
-                      { label: "Volume Weight", active: useVolume, color: T.purple, value: useVolume ? `×${volNorm.toFixed(2)}` : "off", desc: "Conviction scaling" },
-                      { label: "True Range", active: useTrueRange, color: T.gold, value: useTrueRange ? `TR: ${trueRange.toFixed(2)}` : `HL: ${origRange.toFixed(2)}`, desc: "Gap-aware volatility" },
-                      { label: "Regime Gate", active: useRegime, color: T.lime, value: useRegime ? (adx > 25 ? "BLOCKED" : "PASS") : "off", desc: `ADX: ${adx.toFixed(1)}` },
-                    ].map(({ label, active, color, value, desc }) => (
-                      <div key={label} style={{ padding: "10px", background: active ? `${color}0e` : T.off, borderRadius: 7, border: `1px solid ${active ? color + "33" : T.border}` }}>
-                        <div style={{ fontSize: 9, color: active ? color : T.muted, letterSpacing: "0.1em", marginBottom: 4 }}>{label}</div>
-                        <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "monospace", color: active ? color : T.muted }}>{value}</div>
-                        <div style={{ fontSize: 9, color: T.muted, marginTop: 3 }}>{desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {tab === "regime" && (
-              <div>
-                <div style={{ padding: "16px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 14 }}>ADX REGIME CLASSIFICATION</div>
-                  <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, marginBottom: 16 }}>
-                    {[
-                      { label: "Weak / Ranging", range: "0–15", color: T.lime, active: adx <= 15 },
-                      { label: "Developing", range: "15–25", color: T.gold, active: adx > 15 && adx <= 25 },
-                      { label: "Strong Trend", range: "25–40", color: T.red, active: adx > 25 && adx <= 40 },
-                      { label: "Extreme Trend", range: "40+", color: T.red, active: adx > 40 },
-                    ].map(({ label, range, color, active }) => (
-                      <div key={label} style={{ flex: 1, padding: "10px 8px", background: active ? `${color}18` : "transparent", textAlign: "center", borderRight: `1px solid ${T.border}` }}>
-                        <div style={{ fontSize: 9, color: active ? color : T.muted, fontWeight: active ? 800 : 400, letterSpacing: "0.06em" }}>{label}</div>
-                        <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>{range}</div>
-                        {active && <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, margin: "4px auto 0", boxShadow: `0 0 6px ${color}` }} />}
-                      </div>
-                    ))}
-                  </div>
-
-                  <RegimeFlag adx={adx} trendFilter={trendFilter} useRegime={useRegime} trueRange={trueRange} range={origRange} />
-                </div>
-
-                <div style={{ padding: "16px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>TRUE RANGE vs HIGH−LOW BREAKDOWN</div>
-                  {[
-                    { label: "High − Low", value: high - low, color: T.blue },
-                    { label: "|High − Prev Close|", value: Math.abs(high - prevClose), color: T.gold },
-                    { label: "|Low − Prev Close|", value: Math.abs(low - prevClose), color: T.gold },
-                    { label: "True Range (max of above)", value: trueRange, color: T.cyan, bold: true },
-                  ].map(({ label, value, color, bold }) => (
-                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, paddingBottom: 9, borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: bold ? T.text : T.sub }}>{label}</span>
-                      <span style={{ fontSize: bold ? 16 : 13, fontFamily: "monospace", fontWeight: bold ? 800 : 500, color }}>{value.toFixed(3)}</span>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 10, color: T.muted, marginTop: 4 }}>
-                    Gap factor: {((trueRange / (high - low) - 1) * 100).toFixed(1)}% larger than H−L
-                  </div>
-                </div>
-
-                <div style={{ padding: "16px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>WHEN TO TRUST EACH VERSION</div>
-                  {[
-                    { scenario: "Low ADX, small gap, avg volume", rec: "Original ECO is fine", color: T.blue },
-                    { scenario: "Low ADX, large overnight gap", rec: "Enable True Range", color: T.gold },
-                    { scenario: "High-volume breakout candle", rec: "Enable Volume Weighting", color: T.purple },
-                    { scenario: "ADX > 25, strong directional trend", rec: "Suppress ECO entirely → use trend-follow", color: T.red },
-                    { scenario: "Choppy ranging market", rec: "All enhancements active → best ECO quality", color: T.lime },
-                  ].map(({ scenario, rec, color }) => (
-                    <div key={scenario} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${T.border}` }}>
-                      <div style={{ width: 3, height: 36, background: color, borderRadius: 2, flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontSize: 10, color: T.sub }}>{scenario}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color, marginTop: 2 }}>→ {rec}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+        {/* PRICE CHART */}
+        <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+          <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 10 }}>PRICE — {ticker} CLOSE</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <ComposedChart data={filtered} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={T.cyan} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={T.cyan} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                tickFormatter={d => d.slice(5)} interval={Math.floor(filtered.length / 6)} />
+              <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
+                tickFormatter={v => `$${v}`} width={50} />
+              <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                labelStyle={{ color: T.sub }} />
+              <Area type="monotone" dataKey="close" stroke={T.cyan} fill="url(#priceGrad)" strokeWidth={1.5} dot={false} name="Close" />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
+
+        {/* ECO CHART */}
+        {hasEco && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ECO — DEMA + VOLUME-WEIGHTED</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ECO</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredEco} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredEco.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                <Bar dataKey="histogram" name="Histogram" fill={T.muted}
+                  shape={({ x, y, width, height, payload }) => {
+                    const c = payload.histogram >= 0 ? T.lime : T.red;
+                    return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
+                  }} />
+                <Line type="monotone" dataKey="eco" stroke={T.cyan} strokeWidth={2} dot={false} name="ECO" />
+                <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* OBV CHART */}
+        {hasObv && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ON-BALANCE VOLUME (OBV)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>EMA(20)</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredObv} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="obvGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={T.purple} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={T.purple} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredObv.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
+                  tickFormatter={v => fmtVol(v)} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }}
+                  formatter={(v) => [fmtVol(v), ""]} />
+                <Area type="monotone" dataKey="obv" stroke={T.purple} fill="url(#obvGrad)" strokeWidth={2} dot={false} name="OBV" />
+                <Line type="monotone" dataKey="obvEma" stroke={T.gold} strokeWidth={1.5} dot={false} name="EMA(20)" strokeDasharray="4 2" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* STATS GRID */}
+        <div style={{ display: "grid", gridTemplateColumns: hasEco && hasObv ? "1fr 1fr" : "1fr", gap: 14 }}>
+          {hasEco && (
+            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
+              {[
+                ["Method", "DEMA + Vol-Weighted", T.cyan],
+                ["Current ECO", ecoLatest.eco.toFixed(2), T.cyan],
+                ["Current Signal", ecoLatest.signal.toFixed(2), T.gold],
+                ["ECO High", ecoMax.toFixed(2), T.lime],
+                ["ECO Low", ecoMin.toFixed(2), T.red],
+                ["Bullish Bars", `${ecoBullBars} / ${filteredEco.length} (${ecoBullPct}%)`, T.lime],
+                ["Crossovers", `${ecoCrossovers}`, T.purple],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasObv && (
+            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>OBV STATISTICS</div>
+              {[
+                ["Method", "Cumulative Volume", T.purple],
+                ["Current OBV", fmtVol(obvLatest.obv), T.purple],
+                ["OBV EMA(20)", fmtVol(obvLatest.obvEma), T.gold],
+                ["OBV High", fmtVol(obvMax), T.lime],
+                ["OBV Low", fmtVol(obvMin), T.red],
+                ["Trend", obvTrend, obvTrend === "BULLISH" ? T.lime : T.red],
+                ["OBV vs EMA", fmtVol(obvLatest.obv - obvLatest.obvEma), obvLatest.obv > obvLatest.obvEma ? T.lime : T.red],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

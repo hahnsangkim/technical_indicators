@@ -1,0 +1,174 @@
+import express from "express";
+import cors from "cors";
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+app.use(cors());
+
+// ─── ECO Math ─────────────────────────────────────────────────────────────────
+const emaK = (n) => 2 / (n + 1);
+function calcEMA(val, prev, k) { return val * k + prev * (1 - k); }
+function calcDEMA(val, ema1, ema2, k) {
+  const newEma1 = calcEMA(val, ema1, k);
+  const newEma2 = calcEMA(newEma1, ema2, k);
+  return { ema1: newEma1, ema2: newEma2, dema: 2 * newEma1 - newEma2 };
+}
+
+// ─── Load CSV once at startup ─────────────────────────────────────────────────
+const csvPath = join(__dirname, "data", "sp500spy_prices.csv");
+let csvLines;
+try {
+  csvLines = readFileSync(csvPath, "utf-8").trim().split("\n");
+} catch (err) {
+  console.error(`Failed to load CSV: ${csvPath}`);
+  console.error(err.message);
+  process.exit(1);
+}
+
+function parseRows(ticker) {
+  const rows = [];
+  for (let i = 1; i < csvLines.length; i++) {
+    const cols = csvLines[i].split(",");
+    if (cols[1] !== ticker) continue;
+    rows.push({
+      date: cols[0],
+      open: parseFloat(cols[2]),
+      high: parseFloat(cols[3]),
+      low: parseFloat(cols[4]),
+      close: parseFloat(cols[5]),
+      volume: parseFloat(cols[7]),
+    });
+  }
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+  return rows;
+}
+
+// ─── GET /api/tickers ─────────────────────────────────────────────────────────
+app.get("/api/tickers", (req, res) => {
+  const tickers = new Set();
+  for (let i = 1; i < csvLines.length; i++) {
+    tickers.add(csvLines[i].split(",")[1]);
+  }
+  res.json([...tickers].sort());
+});
+
+// ─── Ticker validation ────────────────────────────────────────────────────────
+function validateTicker(raw) {
+  const ticker = (raw || "SPY").toUpperCase();
+  if (!/^[A-Z0-9.]{1,10}$/.test(ticker)) return null;
+  return ticker;
+}
+
+// ─── GET /api/eco?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/eco", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+
+  if (rows.length === 0) {
+    return res.json({ ticker, data: [] });
+  }
+
+  const k25 = emaK(25), k13 = emaK(13), k8 = emaK(8);
+  const avgVol = rows.reduce((s, r) => s + r.volume, 0) / rows.length;
+
+  const first = rows[0];
+  const initChange = (first.close - first.open) * (first.volume / avgVol);
+  const initRange = Math.max(first.high - first.low, 0.001);
+
+  let d25c = { ema1: initChange, ema2: initChange };
+  let d25r = { ema1: initRange, ema2: initRange };
+  let d13n = { ema1: initChange, ema2: initChange };
+  let d13d = { ema1: initRange, ema2: initRange };
+  let sigState = 0;
+
+  const data = rows.map((row) => {
+    const volNorm = row.volume / avgVol;
+    const change = (row.close - row.open) * volNorm;
+    const range = Math.max(row.high - row.low, 0.001);
+
+    const dc = calcDEMA(change, d25c.ema1, d25c.ema2, k25);
+    d25c = { ema1: dc.ema1, ema2: dc.ema2 };
+
+    const dr = calcDEMA(range, d25r.ema1, d25r.ema2, k25);
+    d25r = { ema1: dr.ema1, ema2: dr.ema2 };
+
+    const dn = calcDEMA(dc.dema, d13n.ema1, d13n.ema2, k13);
+    d13n = { ema1: dn.ema1, ema2: dn.ema2 };
+
+    const dd = calcDEMA(dr.dema, d13d.ema1, d13d.ema2, k13);
+    d13d = { ema1: dd.ema1, ema2: dd.ema2 };
+
+    const eco = (dn.dema / Math.max(Math.abs(dd.dema), 0.0001)) * 100;
+    sigState = calcEMA(eco, sigState, k8);
+
+    return {
+      date: row.date,
+      close: +row.close.toFixed(2),
+      volume: Math.round(row.volume),
+      eco: +eco.toFixed(4),
+      signal: +sigState.toFixed(4),
+      histogram: +(eco - sigState).toFixed(4),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
+// ─── GET /api/obv?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/obv", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+
+  if (rows.length === 0) {
+    return res.json({ ticker, data: [] });
+  }
+
+  let obv = 0;
+  const k20 = emaK(20);
+  let obvEma = 0;
+
+  const data = rows.map((row, i) => {
+    if (i === 0) {
+      obv = 0;
+    } else {
+      const prevClose = rows[i - 1].close;
+      if (row.close > prevClose) obv += row.volume;
+      else if (row.close < prevClose) obv -= row.volume;
+      // equal: obv unchanged
+    }
+
+    obvEma = i === 0 ? obv : calcEMA(obv, obvEma, k20);
+
+    return {
+      date: row.date,
+      close: +row.close.toFixed(2),
+      volume: Math.round(row.volume),
+      obv: Math.round(obv),
+      obvEma: Math.round(obvEma),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
+// ─── Health check ─────────────────────────────────────────────────────────────
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", tickers: csvLines.length - 1 });
+});
+
+// ─── Global error handler ─────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: "Internal server error" });
+});
+
+app.listen(PORT, () => {
+  console.log(`ECO API running on port ${PORT}`);
+});
