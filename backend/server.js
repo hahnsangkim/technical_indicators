@@ -560,6 +560,28 @@ app.get("/api/cci", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/roc?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/roc", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 12;
+
+  const data = rows.map((row, i) => {
+    if (i < period) {
+      return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), roc: null };
+    }
+
+    const roc = ((row.close - rows[i - period].close) / rows[i - period].close) * 100;
+
+    return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), roc: +roc.toFixed(4) };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });

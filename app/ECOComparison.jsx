@@ -32,6 +32,7 @@ const INDICATORS = {
   atr: { label: "ATR", desc: "Average True Range (14)", color: "#c44569" },
   adx: { label: "ADX", desc: "Average Directional Index (14)", color: "#6ab04c" },
   cci: { label: "CCI", desc: "Commodity Channel Index (20)", color: "#e056a0" },
+  roc: { label: "ROC", desc: "Rate of Change (12)", color: "#7ed6df" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -196,6 +197,7 @@ export default function Dashboard() {
   const [atrData, setAtrData] = useState(null);
   const [adxData, setAdxData] = useState(null);
   const [cciData, setCciData] = useState(null);
+  const [rocData, setRocData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -302,6 +304,16 @@ export default function Dashboard() {
       setCciData(null);
     }
 
+    if (activeIndicators.includes("roc")) {
+      promises.push(
+        fetch(`${API}/api/roc?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setRocData(res.data))
+      );
+    } else {
+      setRocData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -320,7 +332,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData || rocData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -391,6 +403,13 @@ export default function Dashboard() {
     const n = map[range] || cciData.length;
     return cciData.slice(-n);
   }, [cciData, range]);
+
+  const filteredRoc = useMemo(() => {
+    if (!rocData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": rocData.length };
+    const n = map[range] || rocData.length;
+    return rocData.slice(-n);
+  }, [rocData, range]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -537,9 +556,22 @@ export default function Dashboard() {
     }
   }
 
+  // ROC stats
+  const hasRoc = activeIndicators.includes("roc") && filteredRoc.length > 0;
+  const rocLatest = hasRoc ? filteredRoc[filteredRoc.length - 1] : null;
+  let rocMax = -Infinity, rocMin = Infinity, rocPositiveBars = 0, rocNegativeBars = 0;
+  if (hasRoc) {
+    for (const d of filteredRoc) {
+      if (d.roc !== null && d.roc > rocMax) rocMax = d.roc;
+      if (d.roc !== null && d.roc < rocMin) rocMin = d.roc;
+      if (d.roc !== null && d.roc > 0) rocPositiveBars++;
+      if (d.roc !== null && d.roc < 0) rocNegativeBars++;
+    }
+  }
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? T.lime : T.red) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? "▲ BULLISH" : "▼ BEARISH") : "—";
 
   // KPI cards
   const kpis = [];
@@ -594,6 +626,12 @@ export default function Dashboard() {
     const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
     kpis.push({ label: "CCI", value: cciLatest.cci.toFixed(1), color: INDICATORS.cci.color, sub: `Period: 20` });
     kpis.push({ label: "CCI STATUS", value: cciStatus, color: cciStatusColor, sub: cciLatest.cci > 100 ? "Above +100" : cciLatest.cci < -100 ? "Below -100" : "-100 to +100" });
+  }
+  if (hasRoc && rocLatest.roc !== null) {
+    const rocDirection = rocLatest.roc > 0 ? "POSITIVE" : "NEGATIVE";
+    const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
+    kpis.push({ label: "ROC", value: rocLatest.roc.toFixed(2), color: INDICATORS.roc.color, sub: `Period: 12` });
+    kpis.push({ label: "MOMENTUM", value: rocDirection, color: rocDirColor, sub: rocLatest.roc > 0 ? "Above zero" : "Below zero" });
   }
 
   return (
@@ -936,8 +974,32 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ROC CHART */}
+        {hasRoc && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ROC — RATE OF CHANGE (12)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.roc.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ROC</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.border, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Zero Line</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredRoc} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredRoc.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                <Area type="monotone" dataKey="roc" stroke={INDICATORS.roc.color} fill={`${INDICATORS.roc.color}15`} strokeWidth={2} dot={false} name="ROC" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -1122,6 +1184,29 @@ export default function Dashboard() {
                   ["CCI Low", cciMin.toFixed(2), T.red],
                   ["Overbought Bars", `${cciOverboughtBars} / ${filteredCci.length}`, T.red],
                   ["Oversold Bars", `${cciOversoldBars} / ${filteredCci.length}`, T.lime],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {hasRoc && rocLatest.roc !== null && (() => {
+            const rocDirection = rocLatest.roc > 0 ? "Positive" : "Negative";
+            const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ROC STATISTICS</div>
+                {[
+                  ["Method", "Rate of Change (12)", INDICATORS.roc.color],
+                  ["Current ROC", rocLatest.roc.toFixed(4), INDICATORS.roc.color],
+                  ["Direction", rocDirection, rocDirColor],
+                  ["ROC High", rocMax.toFixed(4), T.lime],
+                  ["ROC Low", rocMin.toFixed(4), T.red],
+                  ["Positive Bars", `${rocPositiveBars} / ${filteredRoc.length}`, T.lime],
+                  ["Negative Bars", `${rocNegativeBars} / ${filteredRoc.length}`, T.red],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
