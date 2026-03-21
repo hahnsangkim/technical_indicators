@@ -31,6 +31,7 @@ const INDICATORS = {
   bollinger: { label: "BB", desc: "Bollinger Bands (20, 2)", color: "#ee5a24" },
   atr: { label: "ATR", desc: "Average True Range (14)", color: "#c44569" },
   adx: { label: "ADX", desc: "Average Directional Index (14)", color: "#6ab04c" },
+  cci: { label: "CCI", desc: "Commodity Channel Index (20)", color: "#e056a0" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -194,6 +195,7 @@ export default function Dashboard() {
   const [bollingerData, setBollingerData] = useState(null);
   const [atrData, setAtrData] = useState(null);
   const [adxData, setAdxData] = useState(null);
+  const [cciData, setCciData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -290,6 +292,16 @@ export default function Dashboard() {
       setAdxData(null);
     }
 
+    if (activeIndicators.includes("cci")) {
+      promises.push(
+        fetch(`${API}/api/cci?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setCciData(res.data))
+      );
+    } else {
+      setCciData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -308,7 +320,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -372,6 +384,13 @@ export default function Dashboard() {
     const n = map[range] || adxData.length;
     return adxData.slice(-n);
   }, [adxData, range]);
+
+  const filteredCci = useMemo(() => {
+    if (!cciData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": cciData.length };
+    const n = map[range] || cciData.length;
+    return cciData.slice(-n);
+  }, [cciData, range]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -505,9 +524,22 @@ export default function Dashboard() {
     }
   }
 
+  // CCI stats
+  const hasCci = activeIndicators.includes("cci") && filteredCci.length > 0;
+  const cciLatest = hasCci ? filteredCci[filteredCci.length - 1] : null;
+  let cciMax = -Infinity, cciMin = Infinity, cciOverboughtBars = 0, cciOversoldBars = 0;
+  if (hasCci) {
+    for (const d of filteredCci) {
+      if (d.cci !== null && d.cci > cciMax) cciMax = d.cci;
+      if (d.cci !== null && d.cci < cciMin) cciMin = d.cci;
+      if (d.cci !== null && d.cci > 100) cciOverboughtBars++;
+      if (d.cci !== null && d.cci < -100) cciOversoldBars++;
+    }
+  }
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : "—";
 
   // KPI cards
   const kpis = [];
@@ -556,6 +588,12 @@ export default function Dashboard() {
     const trendColor = adxLatest.adx > 25 ? T.lime : T.sub;
     kpis.push({ label: "ADX", value: adxLatest.adx.toFixed(1), color: INDICATORS.adx.color, sub: trendStrength });
     kpis.push({ label: "+DI / -DI", value: `${adxLatest.plusDI.toFixed(1)} / ${adxLatest.minusDI.toFixed(1)}`, color: adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red, sub: adxLatest.plusDI > adxLatest.minusDI ? "Bullish" : "Bearish" });
+  }
+  if (hasCci && cciLatest.cci !== null) {
+    const cciStatus = cciLatest.cci > 100 ? "OVERBOUGHT" : cciLatest.cci < -100 ? "OVERSOLD" : "NEUTRAL";
+    const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
+    kpis.push({ label: "CCI", value: cciLatest.cci.toFixed(1), color: INDICATORS.cci.color, sub: `Period: 20` });
+    kpis.push({ label: "CCI STATUS", value: cciStatus, color: cciStatusColor, sub: cciLatest.cci > 100 ? "Above +100" : cciLatest.cci < -100 ? "Below -100" : "-100 to +100" });
   }
 
   return (
@@ -865,8 +903,41 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* CCI CHART */}
+        {hasCci && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>CCI — COMMODITY CHANNEL INDEX (20)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.cci.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>CCI</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (+100)</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-100)</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredCci} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="cciGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={INDICATORS.cci.color} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={INDICATORS.cci.color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredCci.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={100} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                <ReferenceLine y={-100} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                <Area type="monotone" dataKey="cci" stroke={INDICATORS.cci.color} fill="url(#cciGrad)" strokeWidth={2} dot={false} name="CCI" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -1028,6 +1099,29 @@ export default function Dashboard() {
                   ["-DI", adxLatest.minusDI.toFixed(2), T.red],
                   ["Directional Bias", directionalBias, directionalColor],
                   ["ADX High", adxMax.toFixed(2), T.cyan],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {hasCci && cciLatest.cci !== null && (() => {
+            const cciStatus = cciLatest.cci > 100 ? "Overbought" : cciLatest.cci < -100 ? "Oversold" : "Neutral";
+            const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>CCI STATISTICS</div>
+                {[
+                  ["Method", "Typical Price CCI (20)", INDICATORS.cci.color],
+                  ["Current CCI", cciLatest.cci.toFixed(2), INDICATORS.cci.color],
+                  ["Status", cciStatus, cciStatusColor],
+                  ["CCI High", cciMax.toFixed(2), T.lime],
+                  ["CCI Low", cciMin.toFixed(2), T.red],
+                  ["Overbought Bars", `${cciOverboughtBars} / ${filteredCci.length}`, T.red],
+                  ["Oversold Bars", `${cciOversoldBars} / ${filteredCci.length}`, T.lime],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>

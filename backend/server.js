@@ -528,6 +528,38 @@ app.get("/api/adx", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/cci?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/cci", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 20;
+
+  const data = rows.map((row, i) => {
+    const tp = (row.high + row.low + row.close) / 3;
+
+    if (i < period - 1) {
+      return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), cci: null };
+    }
+
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += (rows[j].high + rows[j].low + rows[j].close) / 3;
+    const sma = sum / period;
+
+    let meanDev = 0;
+    for (let j = i - period + 1; j <= i; j++) meanDev += Math.abs((rows[j].high + rows[j].low + rows[j].close) / 3 - sma);
+    meanDev /= period;
+
+    const cci = meanDev === 0 ? 0 : (tp - sma) / (0.015 * meanDev);
+
+    return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), cci: +cci.toFixed(2) };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
