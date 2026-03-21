@@ -383,6 +383,32 @@ app.get("/api/rsi", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/macd?ticker=SPY ─────────────────────────────────────────────────
+app.get("/api/macd", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const k12 = emaK(12), k26 = emaK(26), k9 = emaK(9);
+  let ema12 = rows[0].close, ema26 = rows[0].close, signalLine = 0;
+
+  const data = rows.map((row, i) => {
+    ema12 = i === 0 ? row.close : calcEMA(row.close, ema12, k12);
+    ema26 = i === 0 ? row.close : calcEMA(row.close, ema26, k26);
+    const macd = ema12 - ema26;
+    signalLine = i === 0 ? macd : calcEMA(macd, signalLine, k9);
+    const histogram = macd - signalLine;
+
+    return {
+      date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+      macd: +macd.toFixed(4), signal: +signalLine.toFixed(4), histogram: +histogram.toFixed(4),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });

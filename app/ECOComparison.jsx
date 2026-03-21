@@ -27,6 +27,7 @@ const INDICATORS = {
   obv: { label: "OBV", desc: "On-Balance Volume", color: T.purple },
   demark: { label: "DeMark", desc: "TD Sequential (Setup 9 / Countdown 13)", color: T.gold },
   rsi: { label: "RSI", desc: "Relative Strength Index (14)", color: "#ff9f43" },
+  macd: { label: "MACD", desc: "Moving Average Convergence Divergence", color: "#54a0ff" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -186,6 +187,7 @@ export default function Dashboard() {
   const [obvData, setObvData] = useState(null);
   const [demarkData, setDemarkData] = useState(null);
   const [rsiData, setRsiData] = useState(null);
+  const [macdData, setMacdData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -242,6 +244,16 @@ export default function Dashboard() {
       setRsiData(null);
     }
 
+    if (activeIndicators.includes("macd")) {
+      promises.push(
+        fetch(`${API}/api/macd?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setMacdData(res.data))
+      );
+    } else {
+      setMacdData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -260,7 +272,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -296,6 +308,13 @@ export default function Dashboard() {
     const n = map[range] || rsiData.length;
     return rsiData.slice(-n);
   }, [rsiData, range]);
+
+  const filteredMacd = useMemo(() => {
+    if (!macdData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": macdData.length };
+    const n = map[range] || macdData.length;
+    return macdData.slice(-n);
+  }, [macdData, range]);
 
   // Merge risk line into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -384,9 +403,20 @@ export default function Dashboard() {
     }
   }
 
+  // MACD stats
+  const hasMacd = activeIndicators.includes("macd") && filteredMacd.length > 0;
+  const macdLatest = hasMacd ? filteredMacd[filteredMacd.length - 1] : null;
+  let macdBull = false, macdCrossovers = 0;
+  if (hasMacd) {
+    macdBull = macdLatest.macd > macdLatest.signal;
+    for (let i = 1; i < filteredMacd.length; i++) {
+      if ((filteredMacd[i - 1].macd > filteredMacd[i - 1].signal) !== (filteredMacd[i].macd > filteredMacd[i].signal)) macdCrossovers++;
+    }
+  }
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : "—";
 
   // KPI cards
   const kpis = [];
@@ -414,6 +444,10 @@ export default function Dashboard() {
     const rsiColor = rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub;
     kpis.push({ label: "RSI", value: rsiLatest.rsi.toFixed(1), color: INDICATORS.rsi.color, sub: `Period: 14` });
     kpis.push({ label: "RSI STATUS", value: rsiStatus, color: rsiColor, sub: rsiLatest.rsi > 70 ? "Above 70" : rsiLatest.rsi < 30 ? "Below 30" : "30-70 range" });
+  }
+  if (hasMacd) {
+    kpis.push({ label: "MACD", value: macdLatest.macd.toFixed(2), color: INDICATORS.macd.color, sub: `Signal: ${macdLatest.signal.toFixed(2)}` });
+    kpis.push({ label: "MACD HIST", value: macdLatest.histogram.toFixed(2), color: macdLatest.histogram > 0 ? T.lime : T.red, sub: `${macdCrossovers} crossovers` });
   }
 
   return (
@@ -633,8 +667,39 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* MACD CHART */}
+        {hasMacd && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>MACD — EMA(12, 26, 9)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.macd.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>MACD</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredMacd} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredMacd.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                <Bar dataKey="histogram" name="Histogram" fill={T.muted}
+                  shape={({ x, y, width, height, payload }) => {
+                    const c = payload.histogram >= 0 ? T.lime : T.red;
+                    return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
+                  }} />
+                <Line type="monotone" dataKey="macd" stroke={INDICATORS.macd.color} strokeWidth={2} dot={false} name="MACD" />
+                <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -705,6 +770,24 @@ export default function Dashboard() {
                 ["RSI Low", rsiMin.toFixed(2), T.red],
                 ["Overbought Bars", `${rsiOverboughtBars} / ${filteredRsi.length}`, T.red],
                 ["Oversold Bars", `${rsiOversoldBars} / ${filteredRsi.length}`, T.lime],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasMacd && (
+            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>MACD STATISTICS</div>
+              {[
+                ["Method", "EMA(12, 26, 9)", INDICATORS.macd.color],
+                ["Current MACD", macdLatest.macd.toFixed(4), INDICATORS.macd.color],
+                ["Current Signal", macdLatest.signal.toFixed(4), T.gold],
+                ["Histogram", macdLatest.histogram.toFixed(4), macdLatest.histogram > 0 ? T.lime : T.red],
+                ["Trend", macdBull ? "Bullish" : "Bearish", macdBull ? T.lime : T.red],
+                ["Crossovers", `${macdCrossovers}`, T.purple],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
