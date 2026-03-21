@@ -349,6 +349,40 @@ app.get("/api/demark", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/rsi?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/rsi", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 14;
+  let avgGain = 0, avgLoss = 0;
+
+  const data = rows.map((row, i) => {
+    if (i === 0) return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), rsi: 50 };
+
+    const change = row.close - rows[i - 1].close;
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+
+    if (i <= period) {
+      avgGain += gain / period;
+      avgLoss += loss / period;
+    } else {
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+    }
+
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    const rsi = i < period ? 50 : 100 - (100 / (1 + rs));
+
+    return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), rsi: +rsi.toFixed(2) };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });

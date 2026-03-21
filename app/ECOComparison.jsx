@@ -26,6 +26,7 @@ const INDICATORS = {
   eco: { label: "ECO", desc: "Enhanced Ergodic Candlestick Oscillator", color: T.cyan },
   obv: { label: "OBV", desc: "On-Balance Volume", color: T.purple },
   demark: { label: "DeMark", desc: "TD Sequential (Setup 9 / Countdown 13)", color: T.gold },
+  rsi: { label: "RSI", desc: "Relative Strength Index (14)", color: "#ff9f43" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -184,6 +185,7 @@ export default function Dashboard() {
   const [ecoData, setEcoData] = useState(null);
   const [obvData, setObvData] = useState(null);
   const [demarkData, setDemarkData] = useState(null);
+  const [rsiData, setRsiData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -230,6 +232,16 @@ export default function Dashboard() {
       setDemarkData(null);
     }
 
+    if (activeIndicators.includes("rsi")) {
+      promises.push(
+        fetch(`${API}/api/rsi?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setRsiData(res.data))
+      );
+    } else {
+      setRsiData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -248,7 +260,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData;
+  const primaryData = ecoData || obvData || demarkData || rsiData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -277,6 +289,13 @@ export default function Dashboard() {
     const n = map[range] || demarkData.length;
     return demarkData.slice(-n);
   }, [demarkData, range]);
+
+  const filteredRsi = useMemo(() => {
+    if (!rsiData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": rsiData.length };
+    const n = map[range] || rsiData.length;
+    return rsiData.slice(-n);
+  }, [rsiData, range]);
 
   // Merge risk line into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -352,6 +371,10 @@ export default function Dashboard() {
   const currentRiskLine = hasDemark ? demarkLatest.riskLine : null;
   const currentRiskLineType = hasDemark ? demarkLatest.riskLineType : null;
 
+  // RSI stats
+  const hasRsi = activeIndicators.includes("rsi") && filteredRsi.length > 0;
+  const rsiLatest = hasRsi ? filteredRsi[filteredRsi.length - 1] : null;
+
   // Combined signal badge
   const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : (hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : T.muted);
   const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : (hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : "—");
@@ -376,6 +399,12 @@ export default function Dashboard() {
     if (currentRiskLine) {
       kpis.push({ label: "RISK LINE", value: `$${currentRiskLine}`, color: T.red, sub: `${currentRiskLineType} stop-loss` });
     }
+  }
+  if (hasRsi) {
+    const rsiStatus = rsiLatest.rsi > 70 ? "OVERBOUGHT" : rsiLatest.rsi < 30 ? "OVERSOLD" : "NEUTRAL";
+    const rsiColor = rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub;
+    kpis.push({ label: "RSI", value: rsiLatest.rsi.toFixed(1), color: "#ff9f43", sub: `Period: 14` });
+    kpis.push({ label: "RSI STATUS", value: rsiStatus, color: rsiColor, sub: rsiLatest.rsi > 70 ? "Above 70" : rsiLatest.rsi < 30 ? "Below 30" : "30-70 range" });
   }
 
   return (
@@ -568,8 +597,30 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* RSI CHART */}
+        {hasRsi && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredRsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredRsi.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, 100]} width={30} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={70} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                <ReferenceLine y={50} stroke={T.border} strokeDasharray="3 3" />
+                <ReferenceLine y={30} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                <Area type="monotone" dataKey="rsi" stroke="#ff9f43" fill="#ff9f4315" strokeWidth={2} dot={false} name="RSI" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -620,6 +671,22 @@ export default function Dashboard() {
                 ["Total Signals", `${demarkSignals.length}`, T.blue],
                 ["Last Signal", lastDemarkSignal ? `${lastDemarkSignal.signal.replace(/_/g, " ")}` : "None", lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted],
                 ["Risk Line", currentRiskLine ? `$${currentRiskLine} (${currentRiskLineType})` : "Inactive", currentRiskLine ? T.red : T.muted],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasRsi && (
+            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>RSI STATISTICS</div>
+              {[
+                ["Method", "Wilder's RSI", "#ff9f43"],
+                ["Current RSI", rsiLatest.rsi.toFixed(2), "#ff9f43"],
+                ["Status", rsiLatest.rsi > 70 ? "Overbought" : rsiLatest.rsi < 30 ? "Oversold" : "Neutral",
+                  rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
