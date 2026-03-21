@@ -729,6 +729,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(PORT, () => {
-  console.log(`ECO API running on port ${PORT}`);
-});
+// ─── Start server only when run directly ─────────────────────────────────────
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  app.listen(PORT, () => {
+    console.log(`ECO API running on port ${PORT}`);
+  });
+}
+
+export { app, validateTicker, emaK, calcEMA, calcDEMA };

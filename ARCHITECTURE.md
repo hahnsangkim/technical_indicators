@@ -29,15 +29,17 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 |-----------|---------|
 | `Dashboard` | Main layout, state management, chart rendering |
 | `TickerSearch` | Searchable dropdown for 487 S&P 500 tickers |
-| `IndicatorMenu` | Multi-select indicator toggle (ECO, OBV, DeMark) |
+| `IndicatorMenu` | Multi-select indicator toggle (13 indicators) |
 
 ### Key Patterns
 
 - **AbortController** on every fetch to cancel stale requests on rapid ticker changes
 - **useMemo** for filtered data (3M/6M/1Y/ALL range slicing)
 - **Hooks before returns** — all `useMemo` calls placed before conditional early returns to satisfy React hooks ordering rules
-- **Dynamic KPI cards** — grid adapts based on active indicators (up to 8 cards with all indicators)
-- **Risk line overlay** — DeMark risk line merged into price chart data via date lookup
+- **Generic indicator data map** — single `indicatorData` state + `filteredData` memo replaces per-indicator state (consolidated from 13 individual useState/fetch/memo blocks)
+- **API_KEYS mapping** — handles endpoint name mismatches (e.g., `williamsR` → `williamsr`, `stochRsi` → `stochrsi`)
+- **Dynamic KPI cards** — grid adapts based on active indicators
+- **Price chart overlays** — DeMark risk line, Bollinger Bands, and Ichimoku Cloud merged into price chart data via date lookup
 - **Min/max via loops** — avoids `Math.max(...largeArray)` stack overflow
 
 ## Backend
@@ -52,9 +54,19 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/tickers` | GET | Returns sorted list of all ticker symbols |
-| `/api/eco?ticker=SPY` | GET | ECO indicator data for given ticker |
-| `/api/obv?ticker=SPY` | GET | OBV indicator data for given ticker |
+| `/api/eco?ticker=SPY` | GET | ECO indicator (DEMA + volume-weighted) |
+| `/api/obv?ticker=SPY` | GET | OBV (On-Balance Volume) with EMA(20) signal |
 | `/api/demark?ticker=SPY` | GET | DeMark TD Sequential with risk line |
+| `/api/rsi?ticker=SPY` | GET | RSI (Wilder's, period 14) |
+| `/api/macd?ticker=SPY` | GET | MACD (EMA 12, 26, 9) |
+| `/api/bollinger?ticker=SPY` | GET | Bollinger Bands (SMA 20, 2σ) |
+| `/api/atr?ticker=SPY` | GET | ATR (Average True Range, period 14) |
+| `/api/adx?ticker=SPY` | GET | ADX with +DI/-DI (period 14) |
+| `/api/cci?ticker=SPY` | GET | CCI (Commodity Channel Index, period 20) |
+| `/api/roc?ticker=SPY` | GET | ROC (Rate of Change, period 12) |
+| `/api/williamsr?ticker=SPY` | GET | Williams %R (period 14) |
+| `/api/stochrsi?ticker=SPY` | GET | Stochastic RSI (14, 14, 3, 3) |
+| `/api/ichimoku?ticker=SPY` | GET | Ichimoku Cloud (9, 26, 52) |
 | `/api/health` | GET | Health check with row count |
 
 ### Input Validation
@@ -128,6 +140,111 @@ TD Risk Line (stop-loss):
   Invalidated on close beyond the risk line
 ```
 
+### RSI (Relative Strength Index)
+
+Wilder's smoothed RSI with period 14.
+
+```
+Change = Close_t - Close_(t-1)
+Gain = max(Change, 0),  Loss = max(-Change, 0)
+Initial avg: simple average of first 14 gains/losses
+Smoothing: avgGain = (avgGain * 13 + gain) / 14
+RS = avgGain / avgLoss
+RSI = 100 - (100 / (1 + RS))
+Output: rsi (0-100, warmup=50 for first 14 bars)
+```
+
+### MACD (Moving Average Convergence Divergence)
+
+```
+MACD Line = EMA(12) - EMA(26)
+Signal Line = EMA(9) of MACD
+Histogram = MACD - Signal
+Output: macd, signal, histogram
+```
+
+### Bollinger Bands
+
+```
+Middle = SMA(20)
+Upper = SMA(20) + 2 × StdDev(20)
+Lower = SMA(20) - 2 × StdDev(20)
+Output: upper, middle, lower (null for first 19 bars)
+```
+
+### ATR (Average True Range)
+
+```
+TR = max(High-Low, |High-prevClose|, |Low-prevClose|)
+ATR = Wilder's smoothing of TR over 14 periods
+Output: tr, atr (null for first 13 bars)
+```
+
+### ADX (Average Directional Index)
+
+```
++DM = (High - prevHigh) if upMove > downMove and > 0
+-DM = (prevLow - Low) if downMove > upMove and > 0
+Smoothed TR/+DM/-DM using Wilder's method (period 14)
++DI = (smoothed +DM / smoothed TR) × 100
+-DI = (smoothed -DM / smoothed TR) × 100
+DX = |+DI - -DI| / (+DI + -DI) × 100
+ADX = Wilder's smoothing of DX
+Output: adx, plusDI, minusDI (null for first 14 bars)
+```
+
+### CCI (Commodity Channel Index)
+
+```
+Typical Price = (High + Low + Close) / 3
+SMA = SMA(20) of Typical Price
+Mean Deviation = avg |TP - SMA| over 20 periods
+CCI = (TP - SMA) / (0.015 × Mean Deviation)
+Output: cci (null for first 19 bars)
+```
+
+### ROC (Rate of Change)
+
+```
+ROC = ((Close - Close_12_ago) / Close_12_ago) × 100
+Output: roc (null for first 12 bars)
+```
+
+### Williams %R
+
+```
+%R = ((Highest High_14 - Close) / (Highest High_14 - Lowest Low_14)) × -100
+Output: williamsR (-100 to 0, null for first 13 bars)
+```
+
+### Stochastic RSI
+
+```
+1. Compute RSI(14) series
+2. StochRSI = (RSI - min RSI_14) / (max RSI_14 - min RSI_14)
+3. %K = EMA(3) of StochRSI
+4. %D = EMA(3) of %K
+Output: stochRsi, k, d (0-1, null for first 27 bars)
+```
+
+### Ichimoku Cloud
+
+```
+Tenkan-sen = (9-period high + 9-period low) / 2
+Kijun-sen = (26-period high + 26-period low) / 2
+Senkou Span A = (Tenkan + Kijun) / 2, plotted 26 periods forward
+Senkou Span B = (52-period high + 52-period low) / 2, plotted 26 periods forward
+Chikou Span = Close, shifted 26 periods backward
+Output: tenkan, kijun, senkouA, senkouB, chikou
+```
+
+## Deployment URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend | `https://technicalindicators.vercel.app` |
+| Backend | `https://backend-rho-gray-78.vercel.app` |
+
 ## Environment Variables
 
 | Variable | Location | Value |
@@ -135,6 +252,42 @@ TD Risk Line (stop-loss):
 | `NEXT_PUBLIC_API_URL` | `.env` (dev) | `http://localhost:4000` |
 | `NEXT_PUBLIC_API_URL` | `.env.production` | `https://backend-rho-gray-78.vercel.app` |
 | `PORT` | backend | `4000` (default) |
+
+## Testing
+
+### Backend Tests (vitest + supertest)
+
+```bash
+cd backend && npm test       # 137 tests
+cd backend && npm run test:watch  # watch mode
+```
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `__tests__/math.test.js` | 9 | EMA/DEMA calculations, lag reduction |
+| `__tests__/validation.test.js` | 8 | Input sanitization, defaults, XSS rejection |
+| `__tests__/endpoints.test.js` | 104 | All 13 indicators + tickers + health: fields, bounds, formulas, sorting, warmup nulls, normalization |
+| `__tests__/errors.test.js` | 16 | CORS headers, concurrent requests, response time (<200ms per endpoint) |
+
+### Frontend Tests (vitest + jsdom + React Testing Library)
+
+```bash
+npm test                     # 20 tests
+npm run test:watch           # watch mode
+```
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `__tests__/fmtVol.test.js` | 5 | Volume formatting (B/M/K/raw, negatives) |
+| `__tests__/TickerSearch.test.jsx` | 5 | Dropdown open, search filter, max results, selection, ticker count |
+| `__tests__/IndicatorMenu.test.jsx` | 4 | Badge count, toggle callback, 13 indicators listed, unique colors |
+| `__tests__/Dashboard.test.jsx` | 6 | Loading state, empty data, chart render, KPI cards, range buttons, signal badge |
+
+### Test Architecture
+
+- **Backend** exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA` for testing (server only listens when run directly)
+- **Frontend** exports `TickerSearch`, `IndicatorMenu`, `fmtVol`, `INDICATORS`, `T` as named exports
+- Recharts is mocked in Dashboard tests to avoid canvas/SVG issues in jsdom
 
 ## Local Development
 
@@ -144,6 +297,10 @@ cd backend && npm run dev    # port 4000
 
 # Terminal 2: Frontend
 npm run dev                  # port 3000
+
+# Run all tests
+cd backend && npm test       # backend (137 tests)
+cd .. && npm test            # frontend (20 tests)
 ```
 
 ## Project Structure
@@ -153,19 +310,24 @@ technical_indicators/
 ├── app/
 │   ├── page.js              # Next.js entry
 │   └── ECOComparison.jsx    # Dashboard component
+├── __tests__/               # Frontend tests
+│   ├── setup.js             # Test setup (jest-dom)
+│   ├── fmtVol.test.js       # Format helper tests
+│   ├── TickerSearch.test.jsx # Ticker search component tests
+│   ├── IndicatorMenu.test.jsx # Indicator menu component tests
+│   └── Dashboard.test.jsx   # Dashboard integration tests
 ├── backend/
+│   ├── __tests__/           # Backend tests
+│   │   ├── math.test.js     # EMA/DEMA unit tests
+│   │   ├── validation.test.js # Input validation tests
+│   │   ├── endpoints.test.js  # All 13 indicator API tests
+│   │   └── errors.test.js   # Error handling + performance tests
 │   ├── server.js            # Express API
 │   ├── package.json
 │   ├── vercel.json          # Serverless config
 │   └── data/
 │       └── sp500spy_prices.csv
-├── data/
-│   └── sp500spy_prices.csv  # Source data
-├── strategies/              # Not committed (gitignored)
-│   ├── ECO.md
-│   ├── OBV.md
-│   ├── DeMark.md
-│   └── TDRiskLine.md
+├── vitest.config.js         # Frontend vitest config
 ├── package.json             # Frontend deps
 ├── .env                     # Dev API URL
 └── .env.production          # Prod API URL

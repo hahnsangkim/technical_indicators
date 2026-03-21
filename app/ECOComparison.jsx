@@ -187,6 +187,8 @@ function fmtVol(n) {
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
+export { TickerSearch, IndicatorMenu, fmtVol, INDICATORS, T };
+
 export default function Dashboard() {
   const [tickers, setTickers] = useState([]);
   const [ticker, setTicker] = useState("SPY");
