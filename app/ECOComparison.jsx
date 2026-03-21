@@ -35,6 +35,7 @@ const INDICATORS = {
   roc: { label: "ROC", desc: "Rate of Change (12)", color: "#7ed6df" },
   williamsR: { label: "%R", desc: "Williams %R (14)", color: "#f8a5c2" },
   stochRsi: { label: "StochRSI", desc: "Stochastic RSI (14,14,3,3)", color: "#f9ca24" },
+  ichimoku: { label: "Ichimoku", desc: "Ichimoku Cloud (9, 26, 52)", color: "#a29bfe" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -202,6 +203,7 @@ export default function Dashboard() {
   const [rocData, setRocData] = useState(null);
   const [williamsRData, setWilliamsRData] = useState(null);
   const [stochRsiData, setStochRsiData] = useState(null);
+  const [ichimokuData, setIchimokuData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -338,6 +340,16 @@ export default function Dashboard() {
       setStochRsiData(null);
     }
 
+    if (activeIndicators.includes("ichimoku")) {
+      promises.push(
+        fetch(`${API}/api/ichimoku?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setIchimokuData(res.data))
+      );
+    } else {
+      setIchimokuData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -356,7 +368,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData || rocData || williamsRData || stochRsiData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData || rocData || williamsRData || stochRsiData || ichimokuData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -449,6 +461,13 @@ export default function Dashboard() {
     return stochRsiData.slice(-n);
   }, [stochRsiData, range]);
 
+  const filteredIchimoku = useMemo(() => {
+    if (!ichimokuData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": ichimokuData.length };
+    const n = map[range] || ichimokuData.length;
+    return ichimokuData.slice(-n);
+  }, [ichimokuData, range]);
+
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
     const demarkByDate = {};
@@ -463,13 +482,20 @@ export default function Dashboard() {
         if (d.upper !== null) bbByDate[d.date] = { bbUpper: d.upper, bbMiddle: d.middle, bbLower: d.lower };
       }
     }
-    if (!filteredDemark.length && !filteredBollinger.length) return filtered;
+    const ichByDate = {};
+    if (filteredIchimoku.length) {
+      for (const d of filteredIchimoku) {
+        ichByDate[d.date] = { tenkan: d.tenkan, kijun: d.kijun, senkouA: d.senkouA, senkouB: d.senkouB, chikou: d.chikou };
+      }
+    }
+    if (!filteredDemark.length && !filteredBollinger.length && !filteredIchimoku.length) return filtered;
     return filtered.map(row => ({
       ...row,
       riskLine: demarkByDate[row.date] ?? null,
       ...(bbByDate[row.date] || { bbUpper: null, bbMiddle: null, bbLower: null }),
+      ...(ichByDate[row.date] || { tenkan: null, kijun: null, senkouA: null, senkouB: null, chikou: null }),
     }));
-  }, [filtered, filteredDemark, filteredBollinger]);
+  }, [filtered, filteredDemark, filteredBollinger, filteredIchimoku]);
 
   if (loading || !primaryData) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -631,9 +657,15 @@ export default function Dashboard() {
     }
   }
 
+  // Ichimoku stats
+  const hasIchimoku = activeIndicators.includes("ichimoku") && filteredIchimoku.length > 0;
+  const ichimokuLatest = hasIchimoku ? filteredIchimoku[filteredIchimoku.length - 1] : null;
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? T.lime : T.red) : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub) : hasStochRsi && stochRsiLatest.k !== null ? (stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? "▲ BULLISH" : "▼ BEARISH") : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? "▼ OVERBOUGHT" : williamsRLatest.williamsR < -80 ? "▲ OVERSOLD" : "— NEUTRAL") : hasStochRsi && stochRsiLatest.k !== null ? (stochRsiLatest.k > 0.8 ? "▼ OVERBOUGHT" : stochRsiLatest.k < 0.2 ? "▲ OVERSOLD" : "— NEUTRAL") : "—";
+  const ichimokuBullish = hasIchimoku && ichimokuLatest.senkouA !== null && ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB) && ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null && ichimokuLatest.tenkan > ichimokuLatest.kijun;
+  const ichimokuBearish = hasIchimoku && ichimokuLatest.senkouA !== null && ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB) && ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null && ichimokuLatest.tenkan < ichimokuLatest.kijun;
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? T.lime : T.red) : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub) : hasStochRsi && stochRsiLatest.k !== null ? (stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub) : hasIchimoku ? (ichimokuBullish ? T.lime : ichimokuBearish ? T.red : T.sub) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? "▲ BULLISH" : "▼ BEARISH") : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? "▼ OVERBOUGHT" : williamsRLatest.williamsR < -80 ? "▲ OVERSOLD" : "— NEUTRAL") : hasStochRsi && stochRsiLatest.k !== null ? (stochRsiLatest.k > 0.8 ? "▼ OVERBOUGHT" : stochRsiLatest.k < 0.2 ? "▲ OVERSOLD" : "— NEUTRAL") : hasIchimoku ? (ichimokuBullish ? "▲ BULLISH" : ichimokuBearish ? "▼ BEARISH" : "— NEUTRAL") : "—";
 
   // KPI cards
   const kpis = [];
@@ -707,6 +739,15 @@ export default function Dashboard() {
     kpis.push({ label: "%K", value: stochRsiLatest.k.toFixed(4), color: INDICATORS.stochRsi.color, sub: `%D: ${stochRsiLatest.d.toFixed(4)}` });
     kpis.push({ label: "ZONE", value: srZone, color: srZoneColor, sub: stochRsiLatest.k > 0.8 ? "Above 0.8" : stochRsiLatest.k < 0.2 ? "Below 0.2" : "0.2 to 0.8" });
   }
+  if (hasIchimoku && ichimokuLatest.senkouA !== null) {
+    const aboveCloud = ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
+    const belowCloud = ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
+    const cloudPos = aboveCloud ? "ABOVE CLOUD" : belowCloud ? "BELOW CLOUD" : "IN CLOUD";
+    const cloudColor = aboveCloud ? T.lime : belowCloud ? T.red : T.gold;
+    kpis.push({ label: "CLOUD", value: cloudPos, color: cloudColor, sub: `Tenkan: ${ichimokuLatest.tenkan || "\u2014"}` });
+    const tkCross = ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null ? (ichimokuLatest.tenkan > ichimokuLatest.kijun ? "BULLISH" : "BEARISH") : "\u2014";
+    kpis.push({ label: "TK CROSS", value: tkCross, color: tkCross === "BULLISH" ? T.lime : tkCross === "BEARISH" ? T.red : T.sub, sub: `Kijun: ${ichimokuLatest.kijun || "\u2014"}` });
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", color: T.text }}>
@@ -778,6 +819,9 @@ export default function Dashboard() {
               {hasBollinger && (
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
               )}
+              {hasIchimoku && (
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Ichimoku</span></span>
+              )}
             </div>
           </div>
           <ResponsiveContainer width="100%" height={180}>
@@ -801,6 +845,15 @@ export default function Dashboard() {
                   <Area type="monotone" dataKey="bbUpper" stroke={INDICATORS.bollinger.color} fill="none" strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Upper" />
                   <Area type="monotone" dataKey="bbLower" stroke={INDICATORS.bollinger.color} fill={`${INDICATORS.bollinger.color}10`} strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Lower" />
                   <Line type="monotone" dataKey="bbMiddle" stroke={INDICATORS.bollinger.color} strokeWidth={1} strokeDasharray="2 2" dot={false} name="BB Middle" strokeOpacity={0.5} />
+                </>
+              )}
+              {hasIchimoku && (
+                <>
+                  <Area type="monotone" dataKey="senkouA" stroke="none" fill={`${INDICATORS.ichimoku.color}20`} dot={false} name="Senkou A" />
+                  <Area type="monotone" dataKey="senkouB" stroke="none" fill={`${INDICATORS.ichimoku.color}10`} dot={false} name="Senkou B" />
+                  <Line type="monotone" dataKey="tenkan" stroke={INDICATORS.ichimoku.color} strokeWidth={1} dot={false} name="Tenkan" />
+                  <Line type="monotone" dataKey="kijun" stroke="#fd79a8" strokeWidth={1} dot={false} name="Kijun" />
+                  <Line type="monotone" dataKey="chikou" stroke={T.lime} strokeWidth={1} strokeDasharray="2 2" dot={false} name="Chikou" strokeOpacity={0.5} />
                 </>
               )}
             </ComposedChart>
@@ -1128,7 +1181,7 @@ export default function Dashboard() {
         )}
 
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR, hasStochRsi].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR, hasStochRsi].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR, hasStochRsi, hasIchimoku].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR, hasStochRsi, hasIchimoku].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -1382,6 +1435,33 @@ export default function Dashboard() {
                   ["Zone", srZone, srZoneColor],
                   ["Overbought Bars", `${srOverboughtBars} / ${filteredStochRsi.length}`, T.red],
                   ["Oversold Bars", `${srOversoldBars} / ${filteredStochRsi.length}`, T.lime],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {hasIchimoku && ichimokuLatest.senkouA !== null && (() => {
+            const aboveCloud = ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
+            const belowCloud = ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
+            const cloudPos = aboveCloud ? "Above Cloud" : belowCloud ? "Below Cloud" : "In Cloud";
+            const cloudColor = aboveCloud ? T.lime : belowCloud ? T.red : T.gold;
+            const tkCross = ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null ? (ichimokuLatest.tenkan > ichimokuLatest.kijun ? "Bullish" : "Bearish") : "\u2014";
+            const tkCrossColor = tkCross === "Bullish" ? T.lime : tkCross === "Bearish" ? T.red : T.sub;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ICHIMOKU STATISTICS</div>
+                {[
+                  ["Method", "Ichimoku Cloud (9,26,52)", INDICATORS.ichimoku.color],
+                  ["Tenkan-sen", ichimokuLatest.tenkan !== null ? `$${ichimokuLatest.tenkan}` : "\u2014", INDICATORS.ichimoku.color],
+                  ["Kijun-sen", ichimokuLatest.kijun !== null ? `$${ichimokuLatest.kijun}` : "\u2014", "#fd79a8"],
+                  ["Senkou A", `$${ichimokuLatest.senkouA}`, INDICATORS.ichimoku.color],
+                  ["Senkou B", ichimokuLatest.senkouB !== null ? `$${ichimokuLatest.senkouB}` : "\u2014", INDICATORS.ichimoku.color],
+                  ["Cloud Position", cloudPos, cloudColor],
+                  ["TK Cross", tkCross, tkCrossColor],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>

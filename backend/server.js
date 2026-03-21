@@ -677,6 +677,47 @@ app.get("/api/stochrsi", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/ichimoku?ticker=SPY ─────────────────────────────────────────────
+app.get("/api/ichimoku", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  function periodHL(start, end) {
+    let high = -Infinity, low = Infinity;
+    for (let j = Math.max(0, start); j <= end; j++) {
+      if (rows[j].high > high) high = rows[j].high;
+      if (rows[j].low < low) low = rows[j].low;
+    }
+    return (high + low) / 2;
+  }
+
+  // Pre-compute components
+  const tenkan = [], kijun = [], spanA = [], spanB = [];
+  for (let i = 0; i < rows.length; i++) {
+    tenkan[i] = i < 8 ? null : periodHL(i - 8, i);
+    kijun[i] = i < 25 ? null : periodHL(i - 25, i);
+    spanA[i] = (tenkan[i] !== null && kijun[i] !== null) ? (tenkan[i] + kijun[i]) / 2 : null;
+    spanB[i] = i < 51 ? null : periodHL(i - 51, i);
+  }
+
+  const data = rows.map((row, i) => {
+    const chikouIdx = i + 26;
+
+    return {
+      date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+      tenkan: tenkan[i] !== null ? +tenkan[i].toFixed(2) : null,
+      kijun: kijun[i] !== null ? +kijun[i].toFixed(2) : null,
+      senkouA: i >= 26 && spanA[i - 26] !== null ? +spanA[i - 26].toFixed(2) : null,
+      senkouB: i >= 26 && spanB[i - 26] !== null ? +spanB[i - 26].toFixed(2) : null,
+      chikou: chikouIdx < rows.length ? +rows[chikouIdx].close.toFixed(2) : null,
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
