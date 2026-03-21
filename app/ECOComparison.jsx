@@ -191,19 +191,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState([]);
   const [ticker, setTicker] = useState("SPY");
   const [activeIndicators, setActiveIndicators] = useState(["eco"]);
-  const [ecoData, setEcoData] = useState(null);
-  const [obvData, setObvData] = useState(null);
-  const [demarkData, setDemarkData] = useState(null);
-  const [rsiData, setRsiData] = useState(null);
-  const [macdData, setMacdData] = useState(null);
-  const [bollingerData, setBollingerData] = useState(null);
-  const [atrData, setAtrData] = useState(null);
-  const [adxData, setAdxData] = useState(null);
-  const [cciData, setCciData] = useState(null);
-  const [rocData, setRocData] = useState(null);
-  const [williamsRData, setWilliamsRData] = useState(null);
-  const [stochRsiData, setStochRsiData] = useState(null);
-  const [ichimokuData, setIchimokuData] = useState(null);
+  const [indicatorData, setIndicatorData] = useState({});
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -218,139 +206,24 @@ export default function Dashboard() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    const promises = [];
 
-    if (activeIndicators.includes("eco")) {
-      promises.push(
-        fetch(`${API}/api/eco?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setEcoData(res.data))
-      );
-    } else {
-      setEcoData(null);
-    }
+    // Map INDICATORS keys to API endpoint names (handle mismatches)
+    const API_KEYS = { williamsR: "williamsr", stochRsi: "stochrsi" };
 
-    if (activeIndicators.includes("obv")) {
-      promises.push(
-        fetch(`${API}/api/obv?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setObvData(res.data))
-      );
-    } else {
-      setObvData(null);
-    }
+    const fetches = activeIndicators.map(key => {
+      const endpoint = API_KEYS[key] || key;
+      return fetch(`${API}/api/${endpoint}?ticker=${ticker}`, { signal: controller.signal })
+        .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+        .then(res => ({ key, data: res.data }));
+    });
 
-    if (activeIndicators.includes("demark")) {
-      promises.push(
-        fetch(`${API}/api/demark?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setDemarkData(res.data))
-      );
-    } else {
-      setDemarkData(null);
-    }
-
-    if (activeIndicators.includes("rsi")) {
-      promises.push(
-        fetch(`${API}/api/rsi?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setRsiData(res.data))
-      );
-    } else {
-      setRsiData(null);
-    }
-
-    if (activeIndicators.includes("macd")) {
-      promises.push(
-        fetch(`${API}/api/macd?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setMacdData(res.data))
-      );
-    } else {
-      setMacdData(null);
-    }
-
-    if (activeIndicators.includes("bollinger")) {
-      promises.push(
-        fetch(`${API}/api/bollinger?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setBollingerData(res.data))
-      );
-    } else {
-      setBollingerData(null);
-    }
-
-    if (activeIndicators.includes("atr")) {
-      promises.push(
-        fetch(`${API}/api/atr?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setAtrData(res.data))
-      );
-    } else {
-      setAtrData(null);
-    }
-
-    if (activeIndicators.includes("adx")) {
-      promises.push(
-        fetch(`${API}/api/adx?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setAdxData(res.data))
-      );
-    } else {
-      setAdxData(null);
-    }
-
-    if (activeIndicators.includes("cci")) {
-      promises.push(
-        fetch(`${API}/api/cci?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setCciData(res.data))
-      );
-    } else {
-      setCciData(null);
-    }
-
-    if (activeIndicators.includes("roc")) {
-      promises.push(
-        fetch(`${API}/api/roc?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setRocData(res.data))
-      );
-    } else {
-      setRocData(null);
-    }
-
-    if (activeIndicators.includes("williamsR")) {
-      promises.push(
-        fetch(`${API}/api/williamsr?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setWilliamsRData(res.data))
-      );
-    } else {
-      setWilliamsRData(null);
-    }
-
-    if (activeIndicators.includes("stochRsi")) {
-      promises.push(
-        fetch(`${API}/api/stochrsi?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setStochRsiData(res.data))
-      );
-    } else {
-      setStochRsiData(null);
-    }
-
-    if (activeIndicators.includes("ichimoku")) {
-      promises.push(
-        fetch(`${API}/api/ichimoku?ticker=${ticker}`, { signal: controller.signal })
-          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-          .then(res => setIchimokuData(res.data))
-      );
-    } else {
-      setIchimokuData(null);
-    }
-
-    Promise.all(promises)
+    Promise.all(fetches)
+      .then(results => {
+        const newData = {};
+        for (const k of Object.keys(INDICATORS)) newData[k] = null;
+        for (const { key, data } of results) newData[key] = data;
+        setIndicatorData(newData);
+      })
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
 
@@ -368,7 +241,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData || rocData || williamsRData || stochRsiData || ichimokuData;
+  const primaryData = Object.values(indicatorData).find(d => d && d.length > 0) || null;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -377,125 +250,46 @@ export default function Dashboard() {
     return primaryData.slice(-n);
   }, [primaryData, range]);
 
-  const filteredEco = useMemo(() => {
-    if (!ecoData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": ecoData.length };
-    const n = map[range] || ecoData.length;
-    return ecoData.slice(-n);
-  }, [ecoData, range]);
-
-  const filteredObv = useMemo(() => {
-    if (!obvData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": obvData.length };
-    const n = map[range] || obvData.length;
-    return obvData.slice(-n);
-  }, [obvData, range]);
-
-  const filteredDemark = useMemo(() => {
-    if (!demarkData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": demarkData.length };
-    const n = map[range] || demarkData.length;
-    return demarkData.slice(-n);
-  }, [demarkData, range]);
-
-  const filteredRsi = useMemo(() => {
-    if (!rsiData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": rsiData.length };
-    const n = map[range] || rsiData.length;
-    return rsiData.slice(-n);
-  }, [rsiData, range]);
-
-  const filteredMacd = useMemo(() => {
-    if (!macdData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": macdData.length };
-    const n = map[range] || macdData.length;
-    return macdData.slice(-n);
-  }, [macdData, range]);
-
-  const filteredBollinger = useMemo(() => {
-    if (!bollingerData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": bollingerData.length };
-    const n = map[range] || bollingerData.length;
-    return bollingerData.slice(-n);
-  }, [bollingerData, range]);
-
-  const filteredAtr = useMemo(() => {
-    if (!atrData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": atrData.length };
-    const n = map[range] || atrData.length;
-    return atrData.slice(-n);
-  }, [atrData, range]);
-
-  const filteredAdx = useMemo(() => {
-    if (!adxData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": adxData.length };
-    const n = map[range] || adxData.length;
-    return adxData.slice(-n);
-  }, [adxData, range]);
-
-  const filteredCci = useMemo(() => {
-    if (!cciData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": cciData.length };
-    const n = map[range] || cciData.length;
-    return cciData.slice(-n);
-  }, [cciData, range]);
-
-  const filteredRoc = useMemo(() => {
-    if (!rocData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": rocData.length };
-    const n = map[range] || rocData.length;
-    return rocData.slice(-n);
-  }, [rocData, range]);
-
-  const filteredWilliamsR = useMemo(() => {
-    if (!williamsRData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": williamsRData.length };
-    const n = map[range] || williamsRData.length;
-    return williamsRData.slice(-n);
-  }, [williamsRData, range]);
-
-  const filteredStochRsi = useMemo(() => {
-    if (!stochRsiData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": stochRsiData.length };
-    const n = map[range] || stochRsiData.length;
-    return stochRsiData.slice(-n);
-  }, [stochRsiData, range]);
-
-  const filteredIchimoku = useMemo(() => {
-    if (!ichimokuData) return [];
-    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": ichimokuData.length };
-    const n = map[range] || ichimokuData.length;
-    return ichimokuData.slice(-n);
-  }, [ichimokuData, range]);
+  const filteredData = useMemo(() => {
+    const result = {};
+    const map = { "3M": 63, "6M": 126, "1Y": 252 };
+    for (const k of Object.keys(INDICATORS)) {
+      const data = indicatorData[k];
+      if (!data) { result[k] = []; continue; }
+      const n = map[range] || data.length;
+      result[k] = data.slice(-n);
+    }
+    return result;
+  }, [indicatorData, range]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
     const demarkByDate = {};
-    if (filteredDemark.length) {
-      for (const d of filteredDemark) {
+    if (filteredData.demark.length) {
+      for (const d of filteredData.demark) {
         if (d.riskLine !== null) demarkByDate[d.date] = d.riskLine;
       }
     }
     const bbByDate = {};
-    if (filteredBollinger.length) {
-      for (const d of filteredBollinger) {
+    if (filteredData.bollinger.length) {
+      for (const d of filteredData.bollinger) {
         if (d.upper !== null) bbByDate[d.date] = { bbUpper: d.upper, bbMiddle: d.middle, bbLower: d.lower };
       }
     }
     const ichByDate = {};
-    if (filteredIchimoku.length) {
-      for (const d of filteredIchimoku) {
+    if (filteredData.ichimoku.length) {
+      for (const d of filteredData.ichimoku) {
         ichByDate[d.date] = { tenkan: d.tenkan, kijun: d.kijun, senkouA: d.senkouA, senkouB: d.senkouB, chikou: d.chikou };
       }
     }
-    if (!filteredDemark.length && !filteredBollinger.length && !filteredIchimoku.length) return filtered;
+    if (!filteredData.demark.length && !filteredData.bollinger.length && !filteredData.ichimoku.length) return filtered;
     return filtered.map(row => ({
       ...row,
       riskLine: demarkByDate[row.date] ?? null,
       ...(bbByDate[row.date] || { bbUpper: null, bbMiddle: null, bbLower: null }),
       ...(ichByDate[row.date] || { tenkan: null, kijun: null, senkouA: null, senkouB: null, chikou: null }),
     }));
-  }, [filtered, filteredDemark, filteredBollinger, filteredIchimoku]);
+  }, [filtered, filteredData]);
 
   if (loading || !primaryData) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -513,40 +307,40 @@ export default function Dashboard() {
   const latest = filtered[filtered.length - 1];
 
   // ECO stats
-  const hasEco = activeIndicators.includes("eco") && filteredEco.length > 0;
-  const ecoLatest = hasEco ? filteredEco[filteredEco.length - 1] : null;
+  const hasEco = activeIndicators.includes("eco") && filteredData.eco.length > 0;
+  const ecoLatest = hasEco ? filteredData.eco[filteredData.eco.length - 1] : null;
   let ecoBull = false, ecoCrossovers = 0, ecoBullBars = 0, ecoBullPct = "0", ecoMax = -Infinity, ecoMin = Infinity;
   if (hasEco) {
     ecoBull = ecoLatest.eco > ecoLatest.signal;
-    for (const d of filteredEco) {
+    for (const d of filteredData.eco) {
       if (d.eco > ecoMax) ecoMax = d.eco;
       if (d.eco < ecoMin) ecoMin = d.eco;
       if (d.eco > d.signal) ecoBullBars++;
     }
-    ecoBullPct = ((ecoBullBars / filteredEco.length) * 100).toFixed(0);
-    for (let i = 1; i < filteredEco.length; i++) {
-      if ((filteredEco[i - 1].eco > filteredEco[i - 1].signal) !== (filteredEco[i].eco > filteredEco[i].signal)) ecoCrossovers++;
+    ecoBullPct = ((ecoBullBars / filteredData.eco.length) * 100).toFixed(0);
+    for (let i = 1; i < filteredData.eco.length; i++) {
+      if ((filteredData.eco[i - 1].eco > filteredData.eco[i - 1].signal) !== (filteredData.eco[i].eco > filteredData.eco[i].signal)) ecoCrossovers++;
     }
   }
 
   // OBV stats
-  const hasObv = activeIndicators.includes("obv") && filteredObv.length > 0;
-  const obvLatest = hasObv ? filteredObv[filteredObv.length - 1] : null;
+  const hasObv = activeIndicators.includes("obv") && filteredData.obv.length > 0;
+  const obvLatest = hasObv ? filteredData.obv[filteredData.obv.length - 1] : null;
   let obvTrend = "", obvMax = -Infinity, obvMin = Infinity;
   if (hasObv) {
     obvTrend = obvLatest.obv > obvLatest.obvEma ? "BULLISH" : "BEARISH";
-    for (const d of filteredObv) {
+    for (const d of filteredData.obv) {
       if (d.obv > obvMax) obvMax = d.obv;
       if (d.obv < obvMin) obvMin = d.obv;
     }
   }
 
   // DeMark stats
-  const hasDemark = activeIndicators.includes("demark") && filteredDemark.length > 0;
-  const demarkLatest = hasDemark ? filteredDemark[filteredDemark.length - 1] : null;
+  const hasDemark = activeIndicators.includes("demark") && filteredData.demark.length > 0;
+  const demarkLatest = hasDemark ? filteredData.demark[filteredData.demark.length - 1] : null;
   let demarkSignals = [], demarkSetup9Count = 0, demarkCountdown13Count = 0;
   if (hasDemark) {
-    for (const d of filteredDemark) {
+    for (const d of filteredData.demark) {
       if (d.signal) {
         demarkSignals.push(d);
         if (d.signal.endsWith("SETUP_9")) demarkSetup9Count++;
@@ -559,11 +353,11 @@ export default function Dashboard() {
   const currentRiskLineType = hasDemark ? demarkLatest.riskLineType : null;
 
   // RSI stats
-  const hasRsi = activeIndicators.includes("rsi") && filteredRsi.length > 0;
-  const rsiLatest = hasRsi ? filteredRsi[filteredRsi.length - 1] : null;
+  const hasRsi = activeIndicators.includes("rsi") && filteredData.rsi.length > 0;
+  const rsiLatest = hasRsi ? filteredData.rsi[filteredData.rsi.length - 1] : null;
   let rsiMax = -Infinity, rsiMin = Infinity, rsiOverboughtBars = 0, rsiOversoldBars = 0;
   if (hasRsi) {
-    for (const d of filteredRsi) {
+    for (const d of filteredData.rsi) {
       if (d.rsi > rsiMax) rsiMax = d.rsi;
       if (d.rsi < rsiMin) rsiMin = d.rsi;
       if (d.rsi > 70) rsiOverboughtBars++;
@@ -572,47 +366,47 @@ export default function Dashboard() {
   }
 
   // MACD stats
-  const hasMacd = activeIndicators.includes("macd") && filteredMacd.length > 0;
-  const macdLatest = hasMacd ? filteredMacd[filteredMacd.length - 1] : null;
+  const hasMacd = activeIndicators.includes("macd") && filteredData.macd.length > 0;
+  const macdLatest = hasMacd ? filteredData.macd[filteredData.macd.length - 1] : null;
   let macdBull = false, macdCrossovers = 0;
   if (hasMacd) {
     macdBull = macdLatest.macd > macdLatest.signal;
-    for (let i = 1; i < filteredMacd.length; i++) {
-      if ((filteredMacd[i - 1].macd > filteredMacd[i - 1].signal) !== (filteredMacd[i].macd > filteredMacd[i].signal)) macdCrossovers++;
+    for (let i = 1; i < filteredData.macd.length; i++) {
+      if ((filteredData.macd[i - 1].macd > filteredData.macd[i - 1].signal) !== (filteredData.macd[i].macd > filteredData.macd[i].signal)) macdCrossovers++;
     }
   }
 
   // Bollinger stats
-  const hasBollinger = activeIndicators.includes("bollinger") && filteredBollinger.length > 0;
-  const bollingerLatest = hasBollinger ? filteredBollinger[filteredBollinger.length - 1] : null;
+  const hasBollinger = activeIndicators.includes("bollinger") && filteredData.bollinger.length > 0;
+  const bollingerLatest = hasBollinger ? filteredData.bollinger[filteredData.bollinger.length - 1] : null;
 
   // ATR stats
-  const hasAtr = activeIndicators.includes("atr") && filteredAtr.length > 0;
-  const atrLatest = hasAtr ? filteredAtr[filteredAtr.length - 1] : null;
+  const hasAtr = activeIndicators.includes("atr") && filteredData.atr.length > 0;
+  const atrLatest = hasAtr ? filteredData.atr[filteredData.atr.length - 1] : null;
   let atrMax = -Infinity, atrMin = Infinity;
   if (hasAtr) {
-    for (const d of filteredAtr) {
+    for (const d of filteredData.atr) {
       if (d.atr !== null && d.atr > atrMax) atrMax = d.atr;
       if (d.atr !== null && d.atr < atrMin) atrMin = d.atr;
     }
   }
 
   // ADX stats
-  const hasAdx = activeIndicators.includes("adx") && filteredAdx.length > 0;
-  const adxLatest = hasAdx ? filteredAdx[filteredAdx.length - 1] : null;
+  const hasAdx = activeIndicators.includes("adx") && filteredData.adx.length > 0;
+  const adxLatest = hasAdx ? filteredData.adx[filteredData.adx.length - 1] : null;
   let adxMax = -Infinity;
   if (hasAdx) {
-    for (const d of filteredAdx) {
+    for (const d of filteredData.adx) {
       if (d.adx !== null && d.adx > adxMax) adxMax = d.adx;
     }
   }
 
   // CCI stats
-  const hasCci = activeIndicators.includes("cci") && filteredCci.length > 0;
-  const cciLatest = hasCci ? filteredCci[filteredCci.length - 1] : null;
+  const hasCci = activeIndicators.includes("cci") && filteredData.cci.length > 0;
+  const cciLatest = hasCci ? filteredData.cci[filteredData.cci.length - 1] : null;
   let cciMax = -Infinity, cciMin = Infinity, cciOverboughtBars = 0, cciOversoldBars = 0;
   if (hasCci) {
-    for (const d of filteredCci) {
+    for (const d of filteredData.cci) {
       if (d.cci !== null && d.cci > cciMax) cciMax = d.cci;
       if (d.cci !== null && d.cci < cciMin) cciMin = d.cci;
       if (d.cci !== null && d.cci > 100) cciOverboughtBars++;
@@ -621,11 +415,11 @@ export default function Dashboard() {
   }
 
   // ROC stats
-  const hasRoc = activeIndicators.includes("roc") && filteredRoc.length > 0;
-  const rocLatest = hasRoc ? filteredRoc[filteredRoc.length - 1] : null;
+  const hasRoc = activeIndicators.includes("roc") && filteredData.roc.length > 0;
+  const rocLatest = hasRoc ? filteredData.roc[filteredData.roc.length - 1] : null;
   let rocMax = -Infinity, rocMin = Infinity, rocPositiveBars = 0, rocNegativeBars = 0;
   if (hasRoc) {
-    for (const d of filteredRoc) {
+    for (const d of filteredData.roc) {
       if (d.roc !== null && d.roc > rocMax) rocMax = d.roc;
       if (d.roc !== null && d.roc < rocMin) rocMin = d.roc;
       if (d.roc !== null && d.roc > 0) rocPositiveBars++;
@@ -634,11 +428,11 @@ export default function Dashboard() {
   }
 
   // Williams %R stats
-  const hasWilliamsR = activeIndicators.includes("williamsR") && filteredWilliamsR.length > 0;
-  const williamsRLatest = hasWilliamsR ? filteredWilliamsR[filteredWilliamsR.length - 1] : null;
+  const hasWilliamsR = activeIndicators.includes("williamsR") && filteredData.williamsR.length > 0;
+  const williamsRLatest = hasWilliamsR ? filteredData.williamsR[filteredData.williamsR.length - 1] : null;
   let wrMax = -Infinity, wrMin = Infinity, wrOverboughtBars = 0, wrOversoldBars = 0;
   if (hasWilliamsR) {
-    for (const d of filteredWilliamsR) {
+    for (const d of filteredData.williamsR) {
       if (d.williamsR !== null && d.williamsR > wrMax) wrMax = d.williamsR;
       if (d.williamsR !== null && d.williamsR < wrMin) wrMin = d.williamsR;
       if (d.williamsR !== null && d.williamsR > -20) wrOverboughtBars++;
@@ -647,19 +441,19 @@ export default function Dashboard() {
   }
 
   // StochRSI stats
-  const hasStochRsi = activeIndicators.includes("stochRsi") && filteredStochRsi.length > 0;
-  const stochRsiLatest = hasStochRsi ? filteredStochRsi[filteredStochRsi.length - 1] : null;
+  const hasStochRsi = activeIndicators.includes("stochRsi") && filteredData.stochRsi.length > 0;
+  const stochRsiLatest = hasStochRsi ? filteredData.stochRsi[filteredData.stochRsi.length - 1] : null;
   let srOverboughtBars = 0, srOversoldBars = 0;
   if (hasStochRsi) {
-    for (const d of filteredStochRsi) {
+    for (const d of filteredData.stochRsi) {
       if (d.k !== null && d.k > 0.8) srOverboughtBars++;
       if (d.k !== null && d.k < 0.2) srOversoldBars++;
     }
   }
 
   // Ichimoku stats
-  const hasIchimoku = activeIndicators.includes("ichimoku") && filteredIchimoku.length > 0;
-  const ichimokuLatest = hasIchimoku ? filteredIchimoku[filteredIchimoku.length - 1] : null;
+  const hasIchimoku = activeIndicators.includes("ichimoku") && filteredData.ichimoku.length > 0;
+  const ichimokuLatest = hasIchimoku ? filteredData.ichimoku[filteredData.ichimoku.length - 1] : null;
 
   // Combined signal badge
   const ichimokuBullish = hasIchimoku && ichimokuLatest.senkouA !== null && ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB) && ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null && ichimokuLatest.tenkan > ichimokuLatest.kijun;
@@ -872,9 +666,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredEco} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.eco} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredEco.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.eco.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -902,7 +696,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredObv} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.obv} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="obvGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={T.purple} stopOpacity={0.25} />
@@ -910,7 +704,7 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredObv.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.obv.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
                   tickFormatter={v => fmtVol(v)} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
@@ -935,9 +729,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredDemark} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.demark} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredDemark.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.demark.length / 6)} />
                 <YAxis yAxisId="setup" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
                   domain={[-10, 10]} width={30} tickFormatter={v => Math.abs(v)} />
                 <YAxis yAxisId="countdown" orientation="right" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
@@ -973,9 +767,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredRsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.rsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredRsi.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.rsi.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, 100]} width={30} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1000,9 +794,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredMacd} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.macd} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredMacd.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.macd.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1029,9 +823,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={180}>
-              <ComposedChart data={filteredAtr} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.atr} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredAtr.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.atr.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1053,9 +847,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredAdx} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.adx} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredAdx.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.adx.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, "auto"]} width={30} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1080,7 +874,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredCci} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.cci} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="cciGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={INDICATORS.cci.color} stopOpacity={0.25} />
@@ -1088,7 +882,7 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredCci.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.cci.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1112,9 +906,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredRoc} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.roc} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredRoc.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.roc.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1137,9 +931,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredWilliamsR} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.williamsR} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredWilliamsR.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.williamsR.length / 6)} />
                 <YAxis domain={[-100, 0]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1164,9 +958,9 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredStochRsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={filteredData.stochRsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredStochRsi.length / 6)} />
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.stochRsi.length / 6)} />
                 <YAxis domain={[0, 1]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
@@ -1191,7 +985,7 @@ export default function Dashboard() {
                 ["Current Signal", ecoLatest.signal.toFixed(2), T.gold],
                 ["ECO High", ecoMax.toFixed(2), T.lime],
                 ["ECO Low", ecoMin.toFixed(2), T.red],
-                ["Bullish Bars", `${ecoBullBars} / ${filteredEco.length} (${ecoBullPct}%)`, T.lime],
+                ["Bullish Bars", `${ecoBullBars} / ${filteredData.eco.length} (${ecoBullPct}%)`, T.lime],
                 ["Crossovers", `${ecoCrossovers}`, T.purple],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
@@ -1250,8 +1044,8 @@ export default function Dashboard() {
                   rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub],
                 ["RSI High", rsiMax.toFixed(2), T.lime],
                 ["RSI Low", rsiMin.toFixed(2), T.red],
-                ["Overbought Bars", `${rsiOverboughtBars} / ${filteredRsi.length}`, T.red],
-                ["Oversold Bars", `${rsiOversoldBars} / ${filteredRsi.length}`, T.lime],
+                ["Overbought Bars", `${rsiOverboughtBars} / ${filteredData.rsi.length}`, T.red],
+                ["Oversold Bars", `${rsiOversoldBars} / ${filteredData.rsi.length}`, T.lime],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
@@ -1364,8 +1158,8 @@ export default function Dashboard() {
                   ["Status", cciStatus, cciStatusColor],
                   ["CCI High", cciMax.toFixed(2), T.lime],
                   ["CCI Low", cciMin.toFixed(2), T.red],
-                  ["Overbought Bars", `${cciOverboughtBars} / ${filteredCci.length}`, T.red],
-                  ["Oversold Bars", `${cciOversoldBars} / ${filteredCci.length}`, T.lime],
+                  ["Overbought Bars", `${cciOverboughtBars} / ${filteredData.cci.length}`, T.red],
+                  ["Oversold Bars", `${cciOversoldBars} / ${filteredData.cci.length}`, T.lime],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
@@ -1387,8 +1181,8 @@ export default function Dashboard() {
                   ["Direction", rocDirection, rocDirColor],
                   ["ROC High", rocMax.toFixed(4), T.lime],
                   ["ROC Low", rocMin.toFixed(4), T.red],
-                  ["Positive Bars", `${rocPositiveBars} / ${filteredRoc.length}`, T.lime],
-                  ["Negative Bars", `${rocNegativeBars} / ${filteredRoc.length}`, T.red],
+                  ["Positive Bars", `${rocPositiveBars} / ${filteredData.roc.length}`, T.lime],
+                  ["Negative Bars", `${rocNegativeBars} / ${filteredData.roc.length}`, T.red],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
@@ -1410,8 +1204,8 @@ export default function Dashboard() {
                   ["Status", wrStatus, wrStatusColor],
                   ["%R High", wrMax.toFixed(2), T.lime],
                   ["%R Low", wrMin.toFixed(2), T.red],
-                  ["Overbought Bars", `${wrOverboughtBars} / ${filteredWilliamsR.length}`, T.red],
-                  ["Oversold Bars", `${wrOversoldBars} / ${filteredWilliamsR.length}`, T.lime],
+                  ["Overbought Bars", `${wrOverboughtBars} / ${filteredData.williamsR.length}`, T.red],
+                  ["Oversold Bars", `${wrOversoldBars} / ${filteredData.williamsR.length}`, T.lime],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
@@ -1433,8 +1227,8 @@ export default function Dashboard() {
                   ["%K", stochRsiLatest.k.toFixed(4), INDICATORS.stochRsi.color],
                   ["%D", stochRsiLatest.d.toFixed(4), T.purple],
                   ["Zone", srZone, srZoneColor],
-                  ["Overbought Bars", `${srOverboughtBars} / ${filteredStochRsi.length}`, T.red],
-                  ["Oversold Bars", `${srOversoldBars} / ${filteredStochRsi.length}`, T.lime],
+                  ["Overbought Bars", `${srOverboughtBars} / ${filteredData.stochRsi.length}`, T.red],
+                  ["Oversold Bars", `${srOversoldBars} / ${filteredData.stochRsi.length}`, T.lime],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
