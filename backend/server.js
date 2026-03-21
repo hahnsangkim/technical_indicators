@@ -611,6 +611,72 @@ app.get("/api/williamsr", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/stochrsi?ticker=SPY ─────────────────────────────────────────────
+app.get("/api/stochrsi", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const rsiPeriod = 14, stochPeriod = 14, kSmooth = 3, dSmooth = 3;
+
+  // First compute RSI series
+  let avgGain = 0, avgLoss = 0;
+  const rsiValues = rows.map((row, i) => {
+    if (i === 0) return 50;
+    const change = row.close - rows[i - 1].close;
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+
+    if (i <= rsiPeriod) {
+      avgGain += gain / rsiPeriod;
+      avgLoss += loss / rsiPeriod;
+    } else {
+      avgGain = (avgGain * (rsiPeriod - 1) + gain) / rsiPeriod;
+      avgLoss = (avgLoss * (rsiPeriod - 1) + loss) / rsiPeriod;
+    }
+
+    if (i < rsiPeriod) return 50;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+  });
+
+  // Compute Stochastic RSI
+  const kK = emaK(kSmooth), dK = emaK(dSmooth);
+  let kEma = 0.5, dEma = 0.5;
+  const minLookback = rsiPeriod + stochPeriod - 1;
+
+  const data = rows.map((row, i) => {
+    if (i < minLookback) {
+      return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), stochRsi: null, k: null, d: null };
+    }
+
+    let minRsi = Infinity, maxRsi = -Infinity;
+    for (let j = i - stochPeriod + 1; j <= i; j++) {
+      if (rsiValues[j] < minRsi) minRsi = rsiValues[j];
+      if (rsiValues[j] > maxRsi) maxRsi = rsiValues[j];
+    }
+
+    const range = maxRsi - minRsi;
+    const stochRsi = range === 0 ? 0.5 : (rsiValues[i] - minRsi) / range;
+
+    if (i === minLookback) {
+      kEma = stochRsi;
+      dEma = stochRsi;
+    } else {
+      kEma = calcEMA(stochRsi, kEma, kK);
+      dEma = calcEMA(kEma, dEma, dK);
+    }
+
+    return {
+      date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+      stochRsi: +stochRsi.toFixed(4), k: +kEma.toFixed(4), d: +dEma.toFixed(4),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
