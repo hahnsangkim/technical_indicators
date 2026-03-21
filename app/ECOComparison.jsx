@@ -374,10 +374,19 @@ export default function Dashboard() {
   // RSI stats
   const hasRsi = activeIndicators.includes("rsi") && filteredRsi.length > 0;
   const rsiLatest = hasRsi ? filteredRsi[filteredRsi.length - 1] : null;
+  let rsiMax = -Infinity, rsiMin = Infinity, rsiOverboughtBars = 0, rsiOversoldBars = 0;
+  if (hasRsi) {
+    for (const d of filteredRsi) {
+      if (d.rsi > rsiMax) rsiMax = d.rsi;
+      if (d.rsi < rsiMin) rsiMin = d.rsi;
+      if (d.rsi > 70) rsiOverboughtBars++;
+      if (d.rsi < 30) rsiOversoldBars++;
+    }
+  }
 
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : (hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : T.muted);
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : (hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : "—");
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : "—";
 
   // KPI cards
   const kpis = [];
@@ -403,7 +412,7 @@ export default function Dashboard() {
   if (hasRsi) {
     const rsiStatus = rsiLatest.rsi > 70 ? "OVERBOUGHT" : rsiLatest.rsi < 30 ? "OVERSOLD" : "NEUTRAL";
     const rsiColor = rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub;
-    kpis.push({ label: "RSI", value: rsiLatest.rsi.toFixed(1), color: "#ff9f43", sub: `Period: 14` });
+    kpis.push({ label: "RSI", value: rsiLatest.rsi.toFixed(1), color: INDICATORS.rsi.color, sub: `Period: 14` });
     kpis.push({ label: "RSI STATUS", value: rsiStatus, color: rsiColor, sub: rsiLatest.rsi > 70 ? "Above 70" : rsiLatest.rsi < 30 ? "Below 30" : "30-70 range" });
   }
 
@@ -602,6 +611,11 @@ export default function Dashboard() {
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.rsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>RSI</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (70)</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (30)</span></span>
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
               <ComposedChart data={filteredRsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
@@ -613,7 +627,7 @@ export default function Dashboard() {
                 <ReferenceLine y={70} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
                 <ReferenceLine y={50} stroke={T.border} strokeDasharray="3 3" />
                 <ReferenceLine y={30} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="rsi" stroke="#ff9f43" fill="#ff9f4315" strokeWidth={2} dot={false} name="RSI" />
+                <Area type="monotone" dataKey="rsi" stroke={INDICATORS.rsi.color} fill={`${INDICATORS.rsi.color}15`} strokeWidth={2} dot={false} name="RSI" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -683,10 +697,14 @@ export default function Dashboard() {
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>RSI STATISTICS</div>
               {[
-                ["Method", "Wilder's RSI", "#ff9f43"],
-                ["Current RSI", rsiLatest.rsi.toFixed(2), "#ff9f43"],
+                ["Method", "Wilder's RSI", INDICATORS.rsi.color],
+                ["Current RSI", rsiLatest.rsi.toFixed(2), INDICATORS.rsi.color],
                 ["Status", rsiLatest.rsi > 70 ? "Overbought" : rsiLatest.rsi < 30 ? "Oversold" : "Neutral",
                   rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub],
+                ["RSI High", rsiMax.toFixed(2), T.lime],
+                ["RSI Low", rsiMin.toFixed(2), T.red],
+                ["Overbought Bars", `${rsiOverboughtBars} / ${filteredRsi.length}`, T.red],
+                ["Oversold Bars", `${rsiOversoldBars} / ${filteredRsi.length}`, T.lime],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
