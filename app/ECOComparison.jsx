@@ -28,6 +28,7 @@ const INDICATORS = {
   demark: { label: "DeMark", desc: "TD Sequential (Setup 9 / Countdown 13)", color: T.gold },
   rsi: { label: "RSI", desc: "Relative Strength Index (14)", color: "#ff9f43" },
   macd: { label: "MACD", desc: "Moving Average Convergence Divergence", color: "#54a0ff" },
+  bollinger: { label: "BB", desc: "Bollinger Bands (20, 2)", color: "#ee5a24" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -188,6 +189,7 @@ export default function Dashboard() {
   const [demarkData, setDemarkData] = useState(null);
   const [rsiData, setRsiData] = useState(null);
   const [macdData, setMacdData] = useState(null);
+  const [bollingerData, setBollingerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -254,6 +256,16 @@ export default function Dashboard() {
       setMacdData(null);
     }
 
+    if (activeIndicators.includes("bollinger")) {
+      promises.push(
+        fetch(`${API}/api/bollinger?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setBollingerData(res.data))
+      );
+    } else {
+      setBollingerData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -272,7 +284,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -316,18 +328,34 @@ export default function Dashboard() {
     return macdData.slice(-n);
   }, [macdData, range]);
 
-  // Merge risk line into price data for chart overlay (must be before early returns — hooks rule)
+  const filteredBollinger = useMemo(() => {
+    if (!bollingerData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": bollingerData.length };
+    const n = map[range] || bollingerData.length;
+    return bollingerData.slice(-n);
+  }, [bollingerData, range]);
+
+  // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
-    if (!filteredDemark.length || !filtered.length) return filtered;
     const demarkByDate = {};
-    for (const d of filteredDemark) {
-      if (d.riskLine !== null) demarkByDate[d.date] = d.riskLine;
+    if (filteredDemark.length) {
+      for (const d of filteredDemark) {
+        if (d.riskLine !== null) demarkByDate[d.date] = d.riskLine;
+      }
     }
+    const bbByDate = {};
+    if (filteredBollinger.length) {
+      for (const d of filteredBollinger) {
+        if (d.upper !== null) bbByDate[d.date] = { bbUpper: d.upper, bbMiddle: d.middle, bbLower: d.lower };
+      }
+    }
+    if (!filteredDemark.length && !filteredBollinger.length) return filtered;
     return filtered.map(row => ({
       ...row,
       riskLine: demarkByDate[row.date] ?? null,
+      ...(bbByDate[row.date] || { bbUpper: null, bbMiddle: null, bbLower: null }),
     }));
-  }, [filtered, filteredDemark]);
+  }, [filtered, filteredDemark, filteredBollinger]);
 
   if (loading || !primaryData) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -414,9 +442,13 @@ export default function Dashboard() {
     }
   }
 
+  // Bollinger stats
+  const hasBollinger = activeIndicators.includes("bollinger") && filteredBollinger.length > 0;
+  const bollingerLatest = hasBollinger ? filteredBollinger[filteredBollinger.length - 1] : null;
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : "—";
 
   // KPI cards
   const kpis = [];
@@ -448,6 +480,12 @@ export default function Dashboard() {
   if (hasMacd) {
     kpis.push({ label: "MACD", value: macdLatest.macd.toFixed(2), color: INDICATORS.macd.color, sub: `Signal: ${macdLatest.signal.toFixed(2)}` });
     kpis.push({ label: "MACD HIST", value: macdLatest.histogram.toFixed(2), color: macdLatest.histogram > 0 ? T.lime : T.red, sub: `${macdCrossovers} crossovers` });
+  }
+  if (hasBollinger && bollingerLatest.upper !== null) {
+    const bandwidth = ((bollingerLatest.upper - bollingerLatest.lower) / bollingerLatest.middle * 100);
+    const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
+    kpis.push({ label: "BB WIDTH", value: bandwidth.toFixed(1) + "%", color: INDICATORS.bollinger.color, sub: `Upper: $${bollingerLatest.upper}` });
+    kpis.push({ label: "%B", value: percentB.toFixed(1) + "%", color: percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub, sub: `Lower: $${bollingerLatest.lower}` });
   }
 
   return (
@@ -513,11 +551,14 @@ export default function Dashboard() {
         <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
-            {hasDemark && currentRiskLine && (
-              <div style={{ display: "flex", gap: 14 }}>
+            <div style={{ display: "flex", gap: 14 }}>
+              {hasDemark && currentRiskLine && (
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
-              </div>
-            )}
+              )}
+              {hasBollinger && (
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
+              )}
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={180}>
             <ComposedChart data={priceWithRisk} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
@@ -535,6 +576,13 @@ export default function Dashboard() {
                 labelStyle={{ color: T.sub }} />
               <Area type="monotone" dataKey="close" stroke={T.cyan} fill="url(#priceGrad)" strokeWidth={1.5} dot={false} name="Close" />
               {hasDemark && <Line type="stepAfter" dataKey="riskLine" stroke={T.red} strokeWidth={1.5} strokeDasharray="6 3" dot={false} name="Risk Line" connectNulls={false} />}
+              {hasBollinger && (
+                <>
+                  <Area type="monotone" dataKey="bbUpper" stroke={INDICATORS.bollinger.color} fill="none" strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Upper" />
+                  <Area type="monotone" dataKey="bbLower" stroke={INDICATORS.bollinger.color} fill={`${INDICATORS.bollinger.color}10`} strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Lower" />
+                  <Line type="monotone" dataKey="bbMiddle" stroke={INDICATORS.bollinger.color} strokeWidth={1} strokeDasharray="2 2" dot={false} name="BB Middle" strokeOpacity={0.5} />
+                </>
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -699,7 +747,7 @@ export default function Dashboard() {
         )}
 
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -796,6 +844,31 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+          {hasBollinger && bollingerLatest.upper !== null && (() => {
+            const bandwidth = ((bollingerLatest.upper - bollingerLatest.lower) / bollingerLatest.middle * 100);
+            const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
+            const pricePos = bollingerLatest.close > bollingerLatest.upper ? "Above" : bollingerLatest.close < bollingerLatest.lower ? "Below" : "Within";
+            const pricePosColor = pricePos === "Above" ? T.red : pricePos === "Below" ? T.lime : T.sub;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>BOLLINGER STATISTICS</div>
+                {[
+                  ["Method", "SMA(20) ± 2σ", INDICATORS.bollinger.color],
+                  ["Upper Band", `$${bollingerLatest.upper}`, INDICATORS.bollinger.color],
+                  ["Middle Band", `$${bollingerLatest.middle}`, INDICATORS.bollinger.color],
+                  ["Lower Band", `$${bollingerLatest.lower}`, INDICATORS.bollinger.color],
+                  ["Bandwidth", bandwidth.toFixed(1) + "%", T.cyan],
+                  ["%B", percentB.toFixed(1) + "%", percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub],
+                  ["Price Position", pricePos, pricePosColor],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
       </div>

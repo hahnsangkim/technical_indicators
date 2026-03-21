@@ -409,6 +409,39 @@ app.get("/api/macd", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/bollinger?ticker=SPY ────────────────────────────────────────────
+app.get("/api/bollinger", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 20, mult = 2;
+
+  const data = rows.map((row, i) => {
+    if (i < period - 1) {
+      return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), upper: null, middle: null, lower: null };
+    }
+
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += rows[j].close;
+    const sma = sum / period;
+
+    let sqSum = 0;
+    for (let j = i - period + 1; j <= i; j++) sqSum += (rows[j].close - sma) ** 2;
+    const stdDev = Math.sqrt(sqSum / period);
+
+    return {
+      date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+      upper: +(sma + mult * stdDev).toFixed(2),
+      middle: +sma.toFixed(2),
+      lower: +(sma - mult * stdDev).toFixed(2),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
