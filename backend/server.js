@@ -471,6 +471,63 @@ app.get("/api/atr", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/adx?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/adx", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 14;
+  let smoothedPlusDM = 0, smoothedMinusDM = 0, smoothedTR = 0, adx = 0;
+
+  const data = rows.map((row, i) => {
+    if (i === 0) {
+      return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), adx: null, plusDI: null, minusDI: null };
+    }
+
+    const prevRow = rows[i - 1];
+    const tr = Math.max(row.high - row.low, Math.abs(row.high - prevRow.close), Math.abs(row.low - prevRow.close));
+    const upMove = row.high - prevRow.high;
+    const downMove = prevRow.low - row.low;
+    const plusDM = (upMove > downMove && upMove > 0) ? upMove : 0;
+    const minusDM = (downMove > upMove && downMove > 0) ? downMove : 0;
+
+    if (i <= period) {
+      smoothedTR += tr;
+      smoothedPlusDM += plusDM;
+      smoothedMinusDM += minusDM;
+
+      if (i < period) {
+        return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), adx: null, plusDI: null, minusDI: null };
+      }
+    } else {
+      smoothedTR = smoothedTR - smoothedTR / period + tr;
+      smoothedPlusDM = smoothedPlusDM - smoothedPlusDM / period + plusDM;
+      smoothedMinusDM = smoothedMinusDM - smoothedMinusDM / period + minusDM;
+    }
+
+    const plusDI = (smoothedPlusDM / smoothedTR) * 100;
+    const minusDI = (smoothedMinusDM / smoothedTR) * 100;
+    const dx = Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100;
+
+    if (i === period) {
+      adx = dx;
+    } else if (i > period) {
+      adx = (adx * (period - 1) + dx) / period;
+    }
+
+    return {
+      date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+      adx: i < period ? null : +adx.toFixed(2),
+      plusDI: +plusDI.toFixed(2),
+      minusDI: +minusDI.toFixed(2),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });

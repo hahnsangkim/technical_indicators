@@ -30,6 +30,7 @@ const INDICATORS = {
   macd: { label: "MACD", desc: "Moving Average Convergence Divergence", color: "#54a0ff" },
   bollinger: { label: "BB", desc: "Bollinger Bands (20, 2)", color: "#ee5a24" },
   atr: { label: "ATR", desc: "Average True Range (14)", color: "#c44569" },
+  adx: { label: "ADX", desc: "Average Directional Index (14)", color: "#6ab04c" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -192,6 +193,7 @@ export default function Dashboard() {
   const [macdData, setMacdData] = useState(null);
   const [bollingerData, setBollingerData] = useState(null);
   const [atrData, setAtrData] = useState(null);
+  const [adxData, setAdxData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -278,6 +280,16 @@ export default function Dashboard() {
       setAtrData(null);
     }
 
+    if (activeIndicators.includes("adx")) {
+      promises.push(
+        fetch(`${API}/api/adx?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setAdxData(res.data))
+      );
+    } else {
+      setAdxData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -296,7 +308,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -353,6 +365,13 @@ export default function Dashboard() {
     const n = map[range] || atrData.length;
     return atrData.slice(-n);
   }, [atrData, range]);
+
+  const filteredAdx = useMemo(() => {
+    if (!adxData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": adxData.length };
+    const n = map[range] || adxData.length;
+    return adxData.slice(-n);
+  }, [adxData, range]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -476,9 +495,19 @@ export default function Dashboard() {
     }
   }
 
+  // ADX stats
+  const hasAdx = activeIndicators.includes("adx") && filteredAdx.length > 0;
+  const adxLatest = hasAdx ? filteredAdx[filteredAdx.length - 1] : null;
+  let adxMax = -Infinity;
+  if (hasAdx) {
+    for (const d of filteredAdx) {
+      if (d.adx !== null && d.adx > adxMax) adxMax = d.adx;
+    }
+  }
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : "—";
 
   // KPI cards
   const kpis = [];
@@ -521,6 +550,12 @@ export default function Dashboard() {
     const atrPct = (atrLatest.atr / atrLatest.close * 100);
     kpis.push({ label: "ATR", value: atrLatest.atr.toFixed(2), color: INDICATORS.atr.color, sub: `Period: 14` });
     kpis.push({ label: "ATR %", value: atrPct.toFixed(2) + "%", color: INDICATORS.atr.color, sub: `% of close price` });
+  }
+  if (hasAdx && adxLatest.adx !== null) {
+    const trendStrength = adxLatest.adx > 50 ? "VERY STRONG" : adxLatest.adx > 25 ? "STRONG" : "WEAK";
+    const trendColor = adxLatest.adx > 25 ? T.lime : T.sub;
+    kpis.push({ label: "ADX", value: adxLatest.adx.toFixed(1), color: INDICATORS.adx.color, sub: trendStrength });
+    kpis.push({ label: "+DI / -DI", value: `${adxLatest.plusDI.toFixed(1)} / ${adxLatest.minusDI.toFixed(1)}`, color: adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red, sub: adxLatest.plusDI > adxLatest.minusDI ? "Bullish" : "Bearish" });
   }
 
   return (
@@ -803,8 +838,35 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ADX CHART */}
+        {hasAdx && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ADX — AVERAGE DIRECTIONAL INDEX (14)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.adx.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ADX</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>+DI</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>-DI</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredAdx} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredAdx.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, "auto"]} width={30} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={25} stroke={T.border} strokeDasharray="3 3" />
+                <Line type="monotone" dataKey="adx" stroke={INDICATORS.adx.color} strokeWidth={2} dot={false} name="ADX" />
+                <Line type="monotone" dataKey="plusDI" stroke={T.lime} strokeWidth={1.5} dot={false} name="+DI" />
+                <Line type="monotone" dataKey="minusDI" stroke={T.red} strokeWidth={1.5} dot={false} name="-DI" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -941,6 +1003,31 @@ export default function Dashboard() {
                   ["ATR Low", atrMin.toFixed(4), T.red],
                   ["Current TR", atrLatest.tr.toFixed(4), T.cyan],
                   ["Volatility", volatilityLevel, volatilityColor],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {hasAdx && adxLatest.adx !== null && (() => {
+            const trendStrength = adxLatest.adx > 50 ? "Very Strong" : adxLatest.adx > 25 ? "Strong" : "Weak";
+            const trendStrengthColor = adxLatest.adx > 50 ? T.lime : adxLatest.adx > 25 ? T.cyan : T.sub;
+            const directionalBias = adxLatest.plusDI > adxLatest.minusDI ? "Bullish" : "Bearish";
+            const directionalColor = adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ADX STATISTICS</div>
+                {[
+                  ["Method", "Wilder's ADX (14)", INDICATORS.adx.color],
+                  ["ADX Value", adxLatest.adx.toFixed(2), INDICATORS.adx.color],
+                  ["Trend Strength", trendStrength, trendStrengthColor],
+                  ["+DI", adxLatest.plusDI.toFixed(2), T.lime],
+                  ["-DI", adxLatest.minusDI.toFixed(2), T.red],
+                  ["Directional Bias", directionalBias, directionalColor],
+                  ["ADX High", adxMax.toFixed(2), T.cyan],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
