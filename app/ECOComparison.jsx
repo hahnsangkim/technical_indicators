@@ -33,6 +33,7 @@ const INDICATORS = {
   adx: { label: "ADX", desc: "Average Directional Index (14)", color: "#6ab04c" },
   cci: { label: "CCI", desc: "Commodity Channel Index (20)", color: "#e056a0" },
   roc: { label: "ROC", desc: "Rate of Change (12)", color: "#7ed6df" },
+  williamsR: { label: "%R", desc: "Williams %R (14)", color: "#f8a5c2" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -198,6 +199,7 @@ export default function Dashboard() {
   const [adxData, setAdxData] = useState(null);
   const [cciData, setCciData] = useState(null);
   const [rocData, setRocData] = useState(null);
+  const [williamsRData, setWilliamsRData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -314,6 +316,16 @@ export default function Dashboard() {
       setRocData(null);
     }
 
+    if (activeIndicators.includes("williamsR")) {
+      promises.push(
+        fetch(`${API}/api/williamsr?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setWilliamsRData(res.data))
+      );
+    } else {
+      setWilliamsRData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -332,7 +344,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData || rocData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData || adxData || cciData || rocData || williamsRData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -410,6 +422,13 @@ export default function Dashboard() {
     const n = map[range] || rocData.length;
     return rocData.slice(-n);
   }, [rocData, range]);
+
+  const filteredWilliamsR = useMemo(() => {
+    if (!williamsRData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": williamsRData.length };
+    const n = map[range] || williamsRData.length;
+    return williamsRData.slice(-n);
+  }, [williamsRData, range]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -569,9 +588,22 @@ export default function Dashboard() {
     }
   }
 
+  // Williams %R stats
+  const hasWilliamsR = activeIndicators.includes("williamsR") && filteredWilliamsR.length > 0;
+  const williamsRLatest = hasWilliamsR ? filteredWilliamsR[filteredWilliamsR.length - 1] : null;
+  let wrMax = -Infinity, wrMin = Infinity, wrOverboughtBars = 0, wrOversoldBars = 0;
+  if (hasWilliamsR) {
+    for (const d of filteredWilliamsR) {
+      if (d.williamsR !== null && d.williamsR > wrMax) wrMax = d.williamsR;
+      if (d.williamsR !== null && d.williamsR < wrMin) wrMin = d.williamsR;
+      if (d.williamsR !== null && d.williamsR > -20) wrOverboughtBars++;
+      if (d.williamsR !== null && d.williamsR < -80) wrOversoldBars++;
+    }
+  }
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? T.lime : T.red) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? "▲ BULLISH" : "▼ BEARISH") : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? T.lime : T.red) : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub) : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? "▲ BULLISH" : "▼ BEARISH") : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? "▼ OVERBOUGHT" : williamsRLatest.williamsR < -80 ? "▲ OVERSOLD" : "— NEUTRAL") : "—";
 
   // KPI cards
   const kpis = [];
@@ -632,6 +664,12 @@ export default function Dashboard() {
     const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
     kpis.push({ label: "ROC", value: rocLatest.roc.toFixed(2), color: INDICATORS.roc.color, sub: `Period: 12` });
     kpis.push({ label: "MOMENTUM", value: rocDirection, color: rocDirColor, sub: rocLatest.roc > 0 ? "Above zero" : "Below zero" });
+  }
+  if (hasWilliamsR && williamsRLatest.williamsR !== null) {
+    const wrStatus = williamsRLatest.williamsR > -20 ? "OVERBOUGHT" : williamsRLatest.williamsR < -80 ? "OVERSOLD" : "NEUTRAL";
+    const wrStatusColor = williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub;
+    kpis.push({ label: "%R", value: williamsRLatest.williamsR.toFixed(1), color: INDICATORS.williamsR.color, sub: `Period: 14` });
+    kpis.push({ label: "%R STATUS", value: wrStatus, color: wrStatusColor, sub: williamsRLatest.williamsR > -20 ? "Above -20" : williamsRLatest.williamsR < -80 ? "Below -80" : "-80 to -20" });
   }
 
   return (
@@ -998,8 +1036,34 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* WILLIAMS %R CHART */}
+        {hasWilliamsR && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>WILLIAMS %R (14)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.williamsR.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%R</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (-20)</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-80)</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={filteredWilliamsR} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredWilliamsR.length / 6)} />
+                <YAxis domain={[-100, 0]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <ReferenceLine y={-20} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                <ReferenceLine y={-80} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                <Area type="monotone" dataKey="williamsR" stroke={INDICATORS.williamsR.color} fill={`${INDICATORS.williamsR.color}15`} strokeWidth={2} dot={false} name="Williams %R" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -1207,6 +1271,29 @@ export default function Dashboard() {
                   ["ROC Low", rocMin.toFixed(4), T.red],
                   ["Positive Bars", `${rocPositiveBars} / ${filteredRoc.length}`, T.lime],
                   ["Negative Bars", `${rocNegativeBars} / ${filteredRoc.length}`, T.red],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {hasWilliamsR && williamsRLatest.williamsR !== null && (() => {
+            const wrStatus = williamsRLatest.williamsR > -20 ? "Overbought" : williamsRLatest.williamsR < -80 ? "Oversold" : "Neutral";
+            const wrStatusColor = williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>WILLIAMS %R STATISTICS</div>
+                {[
+                  ["Method", "Williams %R (14)", INDICATORS.williamsR.color],
+                  ["Current %R", williamsRLatest.williamsR.toFixed(2), INDICATORS.williamsR.color],
+                  ["Status", wrStatus, wrStatusColor],
+                  ["%R High", wrMax.toFixed(2), T.lime],
+                  ["%R Low", wrMin.toFixed(2), T.red],
+                  ["Overbought Bars", `${wrOverboughtBars} / ${filteredWilliamsR.length}`, T.red],
+                  ["Oversold Bars", `${wrOversoldBars} / ${filteredWilliamsR.length}`, T.lime],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>

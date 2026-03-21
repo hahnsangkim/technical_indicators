@@ -582,6 +582,35 @@ app.get("/api/roc", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/williamsr?ticker=SPY ────────────────────────────────────────────
+app.get("/api/williamsr", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 14;
+
+  const data = rows.map((row, i) => {
+    if (i < period - 1) {
+      return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), williamsR: null };
+    }
+
+    let highestHigh = -Infinity, lowestLow = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (rows[j].high > highestHigh) highestHigh = rows[j].high;
+      if (rows[j].low < lowestLow) lowestLow = rows[j].low;
+    }
+
+    const range = highestHigh - lowestLow;
+    const wr = range === 0 ? -50 : ((highestHigh - row.close) / range) * -100;
+
+    return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), williamsR: +wr.toFixed(2) };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
