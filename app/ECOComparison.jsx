@@ -29,6 +29,7 @@ const INDICATORS = {
   rsi: { label: "RSI", desc: "Relative Strength Index (14)", color: "#ff9f43" },
   macd: { label: "MACD", desc: "Moving Average Convergence Divergence", color: "#54a0ff" },
   bollinger: { label: "BB", desc: "Bollinger Bands (20, 2)", color: "#ee5a24" },
+  atr: { label: "ATR", desc: "Average True Range (14)", color: "#c44569" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -190,6 +191,7 @@ export default function Dashboard() {
   const [rsiData, setRsiData] = useState(null);
   const [macdData, setMacdData] = useState(null);
   const [bollingerData, setBollingerData] = useState(null);
+  const [atrData, setAtrData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
 
@@ -266,6 +268,16 @@ export default function Dashboard() {
       setBollingerData(null);
     }
 
+    if (activeIndicators.includes("atr")) {
+      promises.push(
+        fetch(`${API}/api/atr?ticker=${ticker}`, { signal: controller.signal })
+          .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+          .then(res => setAtrData(res.data))
+      );
+    } else {
+      setAtrData(null);
+    }
+
     Promise.all(promises)
       .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
       .finally(() => setLoading(false));
@@ -284,7 +296,7 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData;
+  const primaryData = ecoData || obvData || demarkData || rsiData || macdData || bollingerData || atrData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
@@ -334,6 +346,13 @@ export default function Dashboard() {
     const n = map[range] || bollingerData.length;
     return bollingerData.slice(-n);
   }, [bollingerData, range]);
+
+  const filteredAtr = useMemo(() => {
+    if (!atrData) return [];
+    const map = { "3M": 63, "6M": 126, "1Y": 252, "ALL": atrData.length };
+    const n = map[range] || atrData.length;
+    return atrData.slice(-n);
+  }, [atrData, range]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -446,9 +465,20 @@ export default function Dashboard() {
   const hasBollinger = activeIndicators.includes("bollinger") && filteredBollinger.length > 0;
   const bollingerLatest = hasBollinger ? filteredBollinger[filteredBollinger.length - 1] : null;
 
+  // ATR stats
+  const hasAtr = activeIndicators.includes("atr") && filteredAtr.length > 0;
+  const atrLatest = hasAtr ? filteredAtr[filteredAtr.length - 1] : null;
+  let atrMax = -Infinity, atrMin = Infinity;
+  if (hasAtr) {
+    for (const d of filteredAtr) {
+      if (d.atr !== null && d.atr > atrMax) atrMax = d.atr;
+      if (d.atr !== null && d.atr < atrMin) atrMin = d.atr;
+    }
+  }
+
   // Combined signal badge
-  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : T.muted;
-  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : "—";
+  const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : T.muted;
+  const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : "—";
 
   // KPI cards
   const kpis = [];
@@ -486,6 +516,11 @@ export default function Dashboard() {
     const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
     kpis.push({ label: "BB WIDTH", value: bandwidth.toFixed(1) + "%", color: INDICATORS.bollinger.color, sub: `Upper: $${bollingerLatest.upper}` });
     kpis.push({ label: "%B", value: percentB.toFixed(1) + "%", color: percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub, sub: `Lower: $${bollingerLatest.lower}` });
+  }
+  if (hasAtr && atrLatest.atr !== null) {
+    const atrPct = (atrLatest.atr / atrLatest.close * 100);
+    kpis.push({ label: "ATR", value: atrLatest.atr.toFixed(2), color: INDICATORS.atr.color, sub: `Period: 14` });
+    kpis.push({ label: "ATR %", value: atrPct.toFixed(2) + "%", color: INDICATORS.atr.color, sub: `% of close price` });
   }
 
   return (
@@ -746,8 +781,30 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ATR CHART */}
+        {hasAtr && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ATR — AVERAGE TRUE RANGE (14)</div>
+              <div style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.atr.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ATR</span></span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <ComposedChart data={filteredAtr} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredAtr.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <Area type="monotone" dataKey="atr" stroke={INDICATORS.atr.color} fill={`${INDICATORS.atr.color}15`} strokeWidth={2} dot={false} name="ATR" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
@@ -860,6 +917,30 @@ export default function Dashboard() {
                   ["Bandwidth", bandwidth.toFixed(1) + "%", T.cyan],
                   ["%B", percentB.toFixed(1) + "%", percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub],
                   ["Price Position", pricePos, pricePosColor],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {hasAtr && atrLatest.atr !== null && (() => {
+            const atrPct = (atrLatest.atr / atrLatest.close * 100);
+            const volatilityLevel = atrPct > 3 ? "High" : atrPct > 1.5 ? "Moderate" : "Low";
+            const volatilityColor = atrPct > 3 ? T.red : atrPct > 1.5 ? T.gold : T.lime;
+            return (
+              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ATR STATISTICS</div>
+                {[
+                  ["Method", "Wilder's ATR (14)", INDICATORS.atr.color],
+                  ["Current ATR", atrLatest.atr.toFixed(4), INDICATORS.atr.color],
+                  ["ATR %", atrPct.toFixed(2) + "%", INDICATORS.atr.color],
+                  ["ATR High", atrMax.toFixed(4), T.lime],
+                  ["ATR Low", atrMin.toFixed(4), T.red],
+                  ["Current TR", atrLatest.tr.toFixed(4), T.cyan],
+                  ["Volatility", volatilityLevel, volatilityColor],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>

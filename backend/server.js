@@ -442,6 +442,35 @@ app.get("/api/bollinger", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/atr?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/atr", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const period = 14;
+  let atr = 0;
+
+  const data = rows.map((row, i) => {
+    const prevClose = i === 0 ? row.close : rows[i - 1].close;
+    const tr = Math.max(row.high - row.low, Math.abs(row.high - prevClose), Math.abs(row.low - prevClose));
+
+    if (i < period) {
+      atr += tr / period;
+    } else {
+      atr = (atr * (period - 1) + tr) / period;
+    }
+
+    return {
+      date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume),
+      tr: +tr.toFixed(4), atr: i < period - 1 ? null : +atr.toFixed(4),
+    };
+  });
+
+  res.json({ ticker, data });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
