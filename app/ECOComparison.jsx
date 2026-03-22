@@ -204,12 +204,11 @@ export default function Dashboard() {
       .catch(err => console.error("Failed to load tickers:", err));
   }, []);
 
-  // Fetch indicator data based on active selections
+  // Fetch all indicator data when ticker changes
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
 
-    // Map INDICATORS keys to API endpoint names (handle mismatches)
     const API_KEYS = { williamsR: "williamsr", stochRsi: "stochrsi" };
 
     const fetches = activeIndicators.map(key => {
@@ -230,7 +229,48 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [ticker, activeIndicators]);
+  }, [ticker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch only newly activated indicators (without full reload)
+  useEffect(() => {
+    if (loading) return; // skip during initial load
+    const API_KEYS = { williamsR: "williamsr", stochRsi: "stochrsi" };
+    const toFetch = activeIndicators.filter(key => !indicatorData[key]);
+    if (toFetch.length === 0) {
+      // Deactivation — clear removed indicators
+      setIndicatorData(prev => {
+        const next = { ...prev };
+        for (const k of Object.keys(INDICATORS)) {
+          if (!activeIndicators.includes(k)) next[k] = null;
+        }
+        return next;
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    const fetches = toFetch.map(key => {
+      const endpoint = API_KEYS[key] || key;
+      return fetch(`${API}/api/${endpoint}?ticker=${ticker}`, { signal: controller.signal })
+        .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+        .then(res => ({ key, data: res.data }));
+    });
+
+    Promise.all(fetches)
+      .then(results => {
+        setIndicatorData(prev => {
+          const next = { ...prev };
+          for (const k of Object.keys(INDICATORS)) {
+            if (!activeIndicators.includes(k)) next[k] = null;
+          }
+          for (const { key, data } of results) next[key] = data;
+          return next;
+        });
+      })
+      .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); });
+
+    return () => controller.abort();
+  }, [activeIndicators]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleIndicator = (key) => {
     setActiveIndicators(prev => {
