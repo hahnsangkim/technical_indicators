@@ -258,6 +258,7 @@ export default function Dashboard() {
       return;
     }
 
+    setError(null);
     const controller = new AbortController();
     const fetches = toFetch.map(key => {
       const endpoint = API_KEYS[key] || key;
