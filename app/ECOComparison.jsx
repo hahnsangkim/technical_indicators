@@ -961,25 +961,6 @@ export default function Dashboard() {
                     }} name="Close" />
                   </ComposedChart>
                 </ResponsiveContainer>
-                {/* Event list below chart */}
-                {confluenceEvents.length > 0 && (
-                  <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-                    {confluenceEvents.map((evt, i) => {
-                      const evtColor = evt.type === "CAPITULATION" ? T.red : evt.type === "OBV_DIVERGENCE" ? T.purple : T.gold;
-                      return (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 10px", background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
-                          <span style={{ display: "inline-block", width: 8, height: 8, background: evtColor, borderRadius: "50%", flexShrink: 0 }}></span>
-                          <span style={{ color: T.sub, fontSize: 11, minWidth: 72, fontFamily: "monospace" }}>{evt.date}</span>
-                          <span style={{ color: T.text, fontSize: 11, fontWeight: 600 }}>{evt.type.replace(/_/g, " ")}</span>
-                          <span style={{ color: T.sub, fontSize: 11 }}>{evt.signal.replace(/_/g, " ")}</span>
-                          {evt.type === "CAPITULATION" && <span style={{ color: T.red, fontSize: 11, marginLeft: "auto" }}>{evt.volumeRatio}x vol</span>}
-                          {evt.type === "POST_SIGNAL" && <span style={{ color: evt.validation === "CONFIRMED" ? T.lime : T.red, fontSize: 11, marginLeft: "auto" }}>{evt.validation}</span>}
-                          {evt.type === "OBV_DIVERGENCE" && <span style={{ color: T.purple, fontSize: 11, marginLeft: "auto" }}>price {evt.priceDirection} / OBV {evt.obvDirection}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
               <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
                 <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>CONFLUENCE STATISTICS</div>
