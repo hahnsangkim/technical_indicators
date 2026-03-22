@@ -697,9 +697,6 @@ export default function Dashboard() {
                 {hasBollinger && (
                   <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
                 )}
-                {hasIchimoku && (
-                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Ichimoku</span></span>
-                )}
               </div>
             </div>
             <ResponsiveContainer width="100%" height={180}>
@@ -723,15 +720,6 @@ export default function Dashboard() {
                     <Area type="monotone" dataKey="bbUpper" stroke={INDICATORS.bollinger.color} fill="none" strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Upper" />
                     <Area type="monotone" dataKey="bbLower" stroke={INDICATORS.bollinger.color} fill={`${INDICATORS.bollinger.color}10`} strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Lower" />
                     <Line type="monotone" dataKey="bbMiddle" stroke={INDICATORS.bollinger.color} strokeWidth={1} strokeDasharray="2 2" dot={false} name="BB Middle" strokeOpacity={0.5} />
-                  </>
-                )}
-                {hasIchimoku && (
-                  <>
-                    <Area type="monotone" dataKey="senkouA" stroke="none" fill={`${INDICATORS.ichimoku.color}20`} dot={false} name="Senkou A" />
-                    <Area type="monotone" dataKey="senkouB" stroke="none" fill={`${INDICATORS.ichimoku.color}10`} dot={false} name="Senkou B" />
-                    <Line type="monotone" dataKey="tenkan" stroke={INDICATORS.ichimoku.color} strokeWidth={1} dot={false} name="Tenkan" />
-                    <Line type="monotone" dataKey="kijun" stroke="#fd79a8" strokeWidth={1} dot={false} name="Kijun" />
-                    <Line type="monotone" dataKey="chikou" stroke={T.lime} strokeWidth={1} strokeDasharray="2 2" dot={false} name="Chikou" strokeOpacity={0.5} />
                   </>
                 )}
               </ComposedChart>
@@ -1366,36 +1354,65 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* OVERLAY-ONLY STATS (Ichimoku - no separate chart) */}
-        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-          {hasIchimoku && ichimokuLatest.senkouA !== null && (() => {
-            const aboveCloud = ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
-            const belowCloud = ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
-            const cloudPos = aboveCloud ? "Above Cloud" : belowCloud ? "Below Cloud" : "In Cloud";
-            const cloudColor = aboveCloud ? T.lime : belowCloud ? T.red : T.gold;
-            const tkCross = ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null ? (ichimokuLatest.tenkan > ichimokuLatest.kijun ? "Bullish" : "Bearish") : "\u2014";
-            const tkCrossColor = tkCross === "Bullish" ? T.lime : tkCross === "Bearish" ? T.red : T.sub;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ICHIMOKU STATISTICS</div>
-                {[
-                  ["Method", "Ichimoku Cloud (9,26,52)", INDICATORS.ichimoku.color],
-                  ["Tenkan-sen", ichimokuLatest.tenkan !== null ? `$${ichimokuLatest.tenkan}` : "\u2014", INDICATORS.ichimoku.color],
-                  ["Kijun-sen", ichimokuLatest.kijun !== null ? `$${ichimokuLatest.kijun}` : "\u2014", "#fd79a8"],
-                  ["Senkou A", `$${ichimokuLatest.senkouA}`, INDICATORS.ichimoku.color],
-                  ["Senkou B", ichimokuLatest.senkouB !== null ? `$${ichimokuLatest.senkouB}` : "\u2014", INDICATORS.ichimoku.color],
-                  ["Cloud Position", cloudPos, cloudColor],
-                  ["TK Cross", tkCross, tkCrossColor],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
+        {/* ICHIMOKU CHART + STATS */}
+        {hasIchimoku && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>ICHIMOKU CLOUD — (9, 26, 52)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Close</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Tenkan</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: "#fd79a8", borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Kijun</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 8, background: `${INDICATORS.ichimoku.color}30`, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Cloud</span></span>
+                </div>
               </div>
-            );
-          })()}
-        </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={priceWithRisk} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filtered.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
+                    tickFormatter={v => `$${v}`} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <Area type="monotone" dataKey="senkouA" stroke="none" fill={`${INDICATORS.ichimoku.color}20`} dot={false} name="Senkou A" />
+                  <Area type="monotone" dataKey="senkouB" stroke="none" fill={`${INDICATORS.ichimoku.color}10`} dot={false} name="Senkou B" />
+                  <Line type="monotone" dataKey="close" stroke={T.cyan} strokeWidth={1.5} dot={false} name="Close" />
+                  <Line type="monotone" dataKey="tenkan" stroke={INDICATORS.ichimoku.color} strokeWidth={1} dot={false} name="Tenkan" />
+                  <Line type="monotone" dataKey="kijun" stroke="#fd79a8" strokeWidth={1} dot={false} name="Kijun" />
+                  <Line type="monotone" dataKey="chikou" stroke={T.lime} strokeWidth={1} strokeDasharray="2 2" dot={false} name="Chikou" strokeOpacity={0.5} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {ichimokuLatest.senkouA !== null && (() => {
+              const aboveCloud = ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
+              const belowCloud = ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
+              const cloudPos = aboveCloud ? "Above Cloud" : belowCloud ? "Below Cloud" : "In Cloud";
+              const cloudColor = aboveCloud ? T.lime : belowCloud ? T.red : T.gold;
+              const tkCross = ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null ? (ichimokuLatest.tenkan > ichimokuLatest.kijun ? "Bullish" : "Bearish") : "\u2014";
+              const tkCrossColor = tkCross === "Bullish" ? T.lime : tkCross === "Bearish" ? T.red : T.sub;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ICHIMOKU STATISTICS</div>
+                  {[
+                    ["Method", "Ichimoku Cloud (9,26,52)", INDICATORS.ichimoku.color],
+                    ["Tenkan-sen", ichimokuLatest.tenkan !== null ? `$${ichimokuLatest.tenkan}` : "\u2014", INDICATORS.ichimoku.color],
+                    ["Kijun-sen", ichimokuLatest.kijun !== null ? `$${ichimokuLatest.kijun}` : "\u2014", "#fd79a8"],
+                    ["Senkou A", `$${ichimokuLatest.senkouA}`, INDICATORS.ichimoku.color],
+                    ["Senkou B", ichimokuLatest.senkouB !== null ? `$${ichimokuLatest.senkouB}` : "\u2014", INDICATORS.ichimoku.color],
+                    ["Cloud Position", cloudPos, cloudColor],
+                    ["TK Cross", tkCross, tkCrossColor],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
       </div>
       {showWatchlist && (
