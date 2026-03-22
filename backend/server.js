@@ -741,4 +741,4 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
-export { app, validateTicker, emaK, calcEMA, calcDEMA };
+export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows };
