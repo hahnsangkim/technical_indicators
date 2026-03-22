@@ -41,6 +41,8 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 - **Dynamic KPI cards** — grid adapts based on active indicators
 - **Price chart overlays** — DeMark risk line, Bollinger Bands, and Ichimoku Cloud merged into price chart data via date lookup
 - **Min/max via loops** — avoids `Math.max(...largeArray)` stack overflow
+- **Incremental indicator fetching** — toggling indicators only fetches newly activated ones (no full reload), keeping the indicator menu open during multi-select
+- **Responsive layout** — CSS media queries at 768px and 480px breakpoints for header, KPI grid, chart headers/legends, stats grid, and dropdown menus
 
 ## Backend
 

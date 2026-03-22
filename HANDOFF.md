@@ -1,14 +1,14 @@
 # Session Handoff - Technical Indicators Dashboard
 
 > **Last Updated:** 2026-03-21
-> **Last Commit:** `3c7292c` - refactor: consolidate indicator state management into generic data map
+> **Last Commit:** `84fb94a` - fix: responsive stats grid, dropdown overflow on small screens
 > **Branch:** main
 
 ---
 
 ## Current State
 
-**Multi-indicator dashboard with 13 indicators** is fully implemented and tested. All indicators have backend endpoints, frontend chart/KPI/stats panels, and automated tests.
+**Multi-indicator dashboard with 13 indicators** is fully implemented, tested, deployed, and responsive.
 
 ### What's Done
 
@@ -20,10 +20,12 @@
 | Error handling | ✅ Complete | Global handler, CSV load failure, CORS |
 | Frontend Dashboard | ✅ Complete | Price chart + 13 indicator charts/overlays + KPI cards |
 | Ticker search | ✅ Complete | Searchable dropdown, 487 S&P 500 stocks |
-| Indicator menu | ✅ Complete | Multi-select toggle for all 13 indicators |
+| Indicator menu | ✅ Complete | Multi-select toggle, stays open during toggles |
 | AbortController | ✅ Complete | Prevents stale fetch race conditions |
 | Range filter | ✅ Complete | 3M, 6M, 1Y, ALL |
 | Generic data management | ✅ Complete | Consolidated state/fetch/filter into single data map |
+| Incremental indicator fetch | ✅ Complete | Only fetches newly toggled indicators, no full reload |
+| Responsive layout | ✅ Complete | Mobile/tablet breakpoints at 768px and 480px |
 | Vercel deployment | ✅ Complete | Frontend + backend separately deployed |
 | ARCHITECTURE.md | ✅ Complete | Full system documentation for all 13 indicators |
 | TEST_SPECIFICATION.md | ✅ Complete | 150+ test cases specified for all endpoints |
@@ -38,42 +40,18 @@ Frontend:  20 tests passing (4 test files)
 Total:    157 tests passing
 ```
 
-### Indicators Implemented
-
-| Indicator | Endpoint | Chart Type |
-|-----------|----------|------------|
-| ECO | `/api/eco` | Separate panel (line + signal + histogram) |
-| OBV | `/api/obv` | Separate panel (area + EMA signal) |
-| DeMark | `/api/demark` | Separate panel (setup bars + countdown) + risk line overlay on price |
-| RSI | `/api/rsi` | Separate panel (oscillator 0-100, ref lines 30/50/70) |
-| MACD | `/api/macd` | Separate panel (line + signal + histogram, like ECO) |
-| Bollinger Bands | `/api/bollinger` | Overlay on price chart (3 bands) |
-| ATR | `/api/atr` | Separate panel (single volatility line) |
-| ADX | `/api/adx` | Separate panel (ADX + +DI + -DI, ref line 25) |
-| CCI | `/api/cci` | Separate panel (oscillator, ref lines ±100/0) |
-| ROC | `/api/roc` | Separate panel (oscillator around zero) |
-| Williams %R | `/api/williamsr` | Separate panel (oscillator -100 to 0, ref lines -20/-80) |
-| Stochastic RSI | `/api/stochrsi` | Separate panel (%K/%D lines, ref lines 0.2/0.5/0.8) |
-| Ichimoku Cloud | `/api/ichimoku` | Overlay on price chart (5 lines + cloud) |
-
 ### Deployment
 
 - **Frontend:** `https://technicalindicators.vercel.app` (auto-deploy from main)
-- **Backend:** `https://backend-rho-gray-78.vercel.app`
-- **Env:** `.env.production` points frontend to backend URL
+- **Backend:** `https://technical-indicators-api.vercel.app`
+- **Env:** `NEXT_PUBLIC_API_URL` set via Vercel env var (`.env.production` is gitignored)
 
 ---
 
 ## What's Remaining
 
-### High Priority
-
-1. **Deploy updated backend**
-   - 10 new endpoints + server.js export refactor need to be pushed to Vercel
-
 ### Lower Priority
 
-- Responsive/mobile layout improvements
 - Loading skeleton states instead of text spinner
 - Error UI for failed API requests (currently just console.error)
 - Volume confluence analysis (combining DeMark signals with OBV divergence)
@@ -84,8 +62,8 @@ Total:    157 tests passing
 ## Key Files
 
 ### Core Application
-- [app/ECOComparison.jsx](app/ECOComparison.jsx) - Main dashboard component (~1276 lines)
-- [backend/server.js](backend/server.js) - Express API with 13 indicator calculations (~738 lines)
+- [app/ECOComparison.jsx](app/ECOComparison.jsx) - Main dashboard component (~1327 lines)
+- [backend/server.js](backend/server.js) - Express API with 13 indicator calculations (~740 lines)
 
 ### Tests
 - [backend/__tests__/math.test.js](backend/__tests__/math.test.js) - EMA/DEMA unit tests (9 tests)
@@ -140,6 +118,10 @@ cd .. && npm test            # frontend: 20 tests
 - DeMark Risk Line persists until breached on close (intraday wicks don't invalidate per DeMark rules)
 - Frontend uses generic `indicatorData` map + `API_KEYS` for endpoint name mismatches (`williamsR` → `williamsr`, `stochRsi` → `stochrsi`)
 - Bollinger Bands and Ichimoku Cloud are overlaid on the price chart; all others have separate chart panels
-- Backend exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA` for testing; `app.listen()` only runs when executed directly (not imported)
+- Backend exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA` for testing; `app.listen()` only runs when executed directly (not imported); `export default app` for Vercel serverless
 - Frontend exports `TickerSearch`, `IndicatorMenu`, `fmtVol`, `INDICATORS`, `T` as named exports for testing
 - Recharts is mocked in Dashboard tests with simple div wrappers to avoid canvas/SVG issues in jsdom
+- Indicator toggling uses incremental fetch (only new indicators), separate from ticker-change full reload — prevents menu from closing during multi-select
+- Responsive breakpoints: 768px (header stacks, KPI 3-col, stats single-col, legends wrap) and 480px (KPI 2-col, smaller font)
+- Dropdowns capped to `max-width: calc(100vw - 40px)` to prevent overflow on mobile
+- Backend Vercel project renamed from `backend` to `technical-indicators-api`
