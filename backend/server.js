@@ -858,6 +858,211 @@ app.get("/api/confluence", (req, res) => {
   res.json({ ticker, data: events });
 });
 
+// ─── Signal detection ────────────────────────────────────────────────────────
+function detectSignals(rows) {
+  const signals = [];
+  const n = rows.length;
+  const startIdx = Math.max(0, n - 10); // last 10 bars
+
+  // ECO: crossover between eco and signal line
+  const ecoData = calcEco(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = ecoData[i], prev = ecoData[i-1];
+    if (curr.eco !== null && prev.eco !== null && curr.signal !== null && prev.signal !== null) {
+      if (curr.eco > curr.signal && prev.eco <= prev.signal) {
+        signals.push({ date: curr.date, indicator: "eco", signal: "BULLISH_CROSSOVER", direction: "buy", value: +curr.eco.toFixed(2), details: "ECO crossed above signal" });
+      }
+      if (curr.eco < curr.signal && prev.eco >= prev.signal) {
+        signals.push({ date: curr.date, indicator: "eco", signal: "BEARISH_CROSSOVER", direction: "sell", value: +curr.eco.toFixed(2), details: "ECO crossed below signal" });
+      }
+    }
+  }
+
+  // OBV: crossover between obv and obvEma
+  const obvData = calcObv(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = obvData[i], prev = obvData[i-1];
+    if (curr.obv > curr.obvEma && prev.obv <= prev.obvEma) {
+      signals.push({ date: curr.date, indicator: "obv", signal: "BULLISH_CROSSOVER", direction: "buy", value: curr.obv, details: "OBV crossed above EMA(20)" });
+    }
+    if (curr.obv < curr.obvEma && prev.obv >= prev.obvEma) {
+      signals.push({ date: curr.date, indicator: "obv", signal: "BEARISH_CROSSOVER", direction: "sell", value: curr.obv, details: "OBV crossed below EMA(20)" });
+    }
+  }
+
+  // DeMark: any non-null signal field
+  const demarkData = calcDemark(rows);
+  for (let i = startIdx; i < n; i++) {
+    if (demarkData[i].signal) {
+      const dir = demarkData[i].signal.startsWith("BUY") ? "buy" : "sell";
+      signals.push({ date: demarkData[i].date, indicator: "demark", signal: demarkData[i].signal, direction: dir, value: demarkData[i].close, details: demarkData[i].signal.replace(/_/g, " ") });
+    }
+  }
+
+  // RSI: crosses above 70 (overbought entry) or below 30 (oversold entry)
+  const rsiData = calcRsi(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = rsiData[i], prev = rsiData[i-1];
+    if (curr.rsi > 70 && prev.rsi <= 70) {
+      signals.push({ date: curr.date, indicator: "rsi", signal: "OVERBOUGHT_ENTRY", direction: "sell", value: +curr.rsi.toFixed(1), details: "RSI crossed above 70" });
+    }
+    if (curr.rsi < 30 && prev.rsi >= 30) {
+      signals.push({ date: curr.date, indicator: "rsi", signal: "OVERSOLD_ENTRY", direction: "buy", value: +curr.rsi.toFixed(1), details: "RSI crossed below 30" });
+    }
+  }
+
+  // MACD: crossover between macd and signal line
+  const macdData = calcMacd(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = macdData[i], prev = macdData[i-1];
+    if (curr.macd > curr.signal && prev.macd <= prev.signal) {
+      signals.push({ date: curr.date, indicator: "macd", signal: "BULLISH_CROSSOVER", direction: "buy", value: +curr.macd.toFixed(2), details: "MACD crossed above signal" });
+    }
+    if (curr.macd < curr.signal && prev.macd >= prev.signal) {
+      signals.push({ date: curr.date, indicator: "macd", signal: "BEARISH_CROSSOVER", direction: "sell", value: +curr.macd.toFixed(2), details: "MACD crossed below signal" });
+    }
+  }
+
+  // Bollinger: close crosses above upper or below lower
+  const bbData = calcBollinger(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = bbData[i], prev = bbData[i-1];
+    if (curr.upper !== null && prev.upper !== null) {
+      if (curr.close > curr.upper && prev.close <= prev.upper) {
+        signals.push({ date: curr.date, indicator: "bollinger", signal: "UPPER_BREAK", direction: "sell", value: +curr.close.toFixed(2), details: "Close crossed above upper band" });
+      }
+      if (curr.close < curr.lower && prev.close >= prev.lower) {
+        signals.push({ date: curr.date, indicator: "bollinger", signal: "LOWER_BREAK", direction: "buy", value: +curr.close.toFixed(2), details: "Close crossed below lower band" });
+      }
+    }
+  }
+
+  // ATR: volatility spike (atr > 2x its 20-bar average)
+  const atrData = calcAtr(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    if (atrData[i].atr !== null && i >= 20) {
+      let atrSum = 0, atrCount = 0;
+      for (let j = i - 20; j < i; j++) {
+        if (atrData[j].atr !== null) { atrSum += atrData[j].atr; atrCount++; }
+      }
+      if (atrCount > 0 && atrData[i].atr > 2 * (atrSum / atrCount)) {
+        // Only emit if previous bar wasn't also a spike (avoid duplicates)
+        let prevSpike = false;
+        if (i > 0 && atrData[i-1].atr !== null) {
+          let prevSum = 0, prevCount = 0;
+          for (let j = i - 21; j < i - 1; j++) {
+            if (j >= 0 && atrData[j].atr !== null) { prevSum += atrData[j].atr; prevCount++; }
+          }
+          if (prevCount > 0) prevSpike = atrData[i-1].atr > 2 * (prevSum / prevCount);
+        }
+        if (!prevSpike) {
+          signals.push({ date: atrData[i].date, indicator: "atr", signal: "VOLATILITY_SPIKE", direction: "neutral", value: +atrData[i].atr.toFixed(2), details: "ATR exceeded 2x 20-bar average" });
+        }
+      }
+    }
+  }
+
+  // ADX: crosses above 25 (trend becomes strong)
+  const adxData = calcAdx(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = adxData[i], prev = adxData[i-1];
+    if (curr.adx !== null && prev.adx !== null) {
+      if (curr.adx > 25 && prev.adx <= 25) {
+        const dir = curr.plusDI > curr.minusDI ? "buy" : "sell";
+        signals.push({ date: curr.date, indicator: "adx", signal: "TREND_STRENGTH", direction: dir, value: +curr.adx.toFixed(1), details: `ADX crossed above 25 (${dir === "buy" ? "+DI" : "-DI"} dominant)` });
+      }
+    }
+  }
+
+  // CCI: crosses above 100 or below -100
+  const cciData = calcCci(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = cciData[i], prev = cciData[i-1];
+    if (curr.cci !== null && prev.cci !== null) {
+      if (curr.cci > 100 && prev.cci <= 100) {
+        signals.push({ date: curr.date, indicator: "cci", signal: "OVERBOUGHT_ENTRY", direction: "sell", value: +curr.cci.toFixed(1), details: "CCI crossed above 100" });
+      }
+      if (curr.cci < -100 && prev.cci >= -100) {
+        signals.push({ date: curr.date, indicator: "cci", signal: "OVERSOLD_ENTRY", direction: "buy", value: +curr.cci.toFixed(1), details: "CCI crossed below -100" });
+      }
+    }
+  }
+
+  // ROC: crosses zero
+  const rocData = calcRoc(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = rocData[i], prev = rocData[i-1];
+    if (curr.roc !== null && prev.roc !== null) {
+      if (curr.roc > 0 && prev.roc <= 0) {
+        signals.push({ date: curr.date, indicator: "roc", signal: "BULLISH_CROSS", direction: "buy", value: +curr.roc.toFixed(2), details: "ROC crossed above zero" });
+      }
+      if (curr.roc < 0 && prev.roc >= 0) {
+        signals.push({ date: curr.date, indicator: "roc", signal: "BEARISH_CROSS", direction: "sell", value: +curr.roc.toFixed(2), details: "ROC crossed below zero" });
+      }
+    }
+  }
+
+  // Williams %R: crosses above -20 or below -80
+  const wrData = calcWilliamsR(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = wrData[i], prev = wrData[i-1];
+    if (curr.williamsR !== null && prev.williamsR !== null) {
+      if (curr.williamsR > -20 && prev.williamsR <= -20) {
+        signals.push({ date: curr.date, indicator: "williamsR", signal: "OVERBOUGHT_ENTRY", direction: "sell", value: +curr.williamsR.toFixed(1), details: "Williams %R crossed above -20" });
+      }
+      if (curr.williamsR < -80 && prev.williamsR >= -80) {
+        signals.push({ date: curr.date, indicator: "williamsR", signal: "OVERSOLD_ENTRY", direction: "buy", value: +curr.williamsR.toFixed(1), details: "Williams %R crossed below -80" });
+      }
+    }
+  }
+
+  // StochRSI: K crosses above 0.8 or below 0.2
+  const srData = calcStochRsi(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = srData[i], prev = srData[i-1];
+    if (curr.k !== null && prev.k !== null) {
+      if (curr.k > 0.8 && prev.k <= 0.8) {
+        signals.push({ date: curr.date, indicator: "stochRsi", signal: "OVERBOUGHT_ENTRY", direction: "sell", value: +curr.k.toFixed(3), details: "StochRSI K crossed above 0.8" });
+      }
+      if (curr.k < 0.2 && prev.k >= 0.2) {
+        signals.push({ date: curr.date, indicator: "stochRsi", signal: "OVERSOLD_ENTRY", direction: "buy", value: +curr.k.toFixed(3), details: "StochRSI K crossed below 0.2" });
+      }
+    }
+  }
+
+  // Ichimoku: close crosses above or below cloud
+  const ichData = calcIchimoku(rows);
+  for (let i = Math.max(startIdx, 1); i < n; i++) {
+    const curr = ichData[i], prev = ichData[i-1];
+    if (curr.senkouA !== null && curr.senkouB !== null && prev.senkouA !== null && prev.senkouB !== null) {
+      const currAbove = curr.close > Math.max(curr.senkouA, curr.senkouB);
+      const prevAbove = prev.close > Math.max(prev.senkouA, prev.senkouB);
+      const currBelow = curr.close < Math.min(curr.senkouA, curr.senkouB);
+      const prevBelow = prev.close < Math.min(prev.senkouA, prev.senkouB);
+      if (currAbove && !prevAbove) {
+        signals.push({ date: curr.date, indicator: "ichimoku", signal: "ABOVE_CLOUD", direction: "buy", value: curr.close, details: "Close crossed above Ichimoku cloud" });
+      }
+      if (currBelow && !prevBelow) {
+        signals.push({ date: curr.date, indicator: "ichimoku", signal: "BELOW_CLOUD", direction: "sell", value: curr.close, details: "Close crossed below Ichimoku cloud" });
+      }
+    }
+  }
+
+  signals.sort((a, b) => b.date.localeCompare(a.date)); // newest first
+  return signals;
+}
+
+// ─── GET /api/signals?ticker=SPY ────────────────────────────────────────────
+app.get("/api/signals", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, signals: [], totalSignals: 0 });
+
+  const signals = detectSignals(rows);
+  res.json({ ticker, signals, totalSignals: signals.length });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
