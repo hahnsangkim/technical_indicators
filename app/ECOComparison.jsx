@@ -552,6 +552,17 @@ export default function Dashboard() {
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: ${T.bg}; }
         ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 2px; }
+        @media (max-width: 768px) {
+          .header-bar { flex-direction: column !important; gap: 10px !important; align-items: flex-start !important; }
+          .header-right { flex-wrap: wrap !important; }
+          .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
+          .chart-legend { flex-wrap: wrap !important; gap: 6px !important; }
+          .chart-header { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
+        }
+        @media (max-width: 480px) {
+          .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .kpi-value { font-size: 16px !important; }
+        }
       `}</style>
 
       {/* HEADER */}
@@ -560,7 +571,7 @@ export default function Dashboard() {
         background: `${T.surface}ee`, backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 20
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 1200, margin: "0 auto" }}>
+        <div className="header-bar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.2em" }}>TECHNICAL INDICATORS</div>
@@ -570,7 +581,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <IndicatorMenu active={activeIndicators} onToggle={toggleIndicator} />
             {/* Signal badge */}
             <div style={{ padding: "6px 14px", borderRadius: 6, background: `${sigColor}15`, border: `1px solid ${sigColor}40` }}>
@@ -594,11 +605,11 @@ export default function Dashboard() {
       <div style={{ padding: "16px", maxWidth: 1200, margin: "0 auto" }}>
 
         {/* KPI CARDS */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${kpis.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
+        <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(120px, 1fr))`, gap: 10, marginBottom: 14 }}>
           {kpis.map(({ label, value, color, sub }) => (
             <div key={label} style={{ padding: "12px 14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, textAlign: "center" }}>
               <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.14em", marginBottom: 6 }}>{label}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "-0.03em", lineHeight: 1 }}>{value}</div>
+              <div className="kpi-value" style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "-0.03em", lineHeight: 1, wordBreak: "break-all" }}>{value}</div>
               <div style={{ fontSize: 9, color: T.sub, marginTop: 5 }}>{sub}</div>
             </div>
           ))}
@@ -606,9 +617,9 @@ export default function Dashboard() {
 
         {/* PRICE CHART */}
         <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
-            <div style={{ display: "flex", gap: 14 }}>
+            <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
               {hasDemark && currentRiskLine && (
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
               )}
@@ -659,9 +670,9 @@ export default function Dashboard() {
         {/* ECO CHART */}
         {hasEco && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ECO — DEMA + VOLUME-WEIGHTED</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ECO</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
@@ -690,9 +701,9 @@ export default function Dashboard() {
         {/* OBV CHART */}
         {hasObv && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ON-BALANCE VOLUME (OBV)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>EMA(20)</span></span>
               </div>
@@ -722,9 +733,9 @@ export default function Dashboard() {
         {/* DEMARK CHART */}
         {hasDemark && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>TD SEQUENTIAL — SETUP &amp; COUNTDOWN</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Buy Setup</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Sell Setup</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Countdown</span></span>
@@ -760,9 +771,9 @@ export default function Dashboard() {
         {/* RSI CHART */}
         {hasRsi && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.rsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>RSI</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (70)</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (30)</span></span>
@@ -787,9 +798,9 @@ export default function Dashboard() {
         {/* MACD CHART */}
         {hasMacd && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>MACD — EMA(12, 26, 9)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.macd.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>MACD</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
@@ -818,9 +829,9 @@ export default function Dashboard() {
         {/* ATR CHART */}
         {hasAtr && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ATR — AVERAGE TRUE RANGE (14)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.atr.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ATR</span></span>
               </div>
             </div>
@@ -840,9 +851,9 @@ export default function Dashboard() {
         {/* ADX CHART */}
         {hasAdx && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ADX — AVERAGE DIRECTIONAL INDEX (14)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.adx.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ADX</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>+DI</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>-DI</span></span>
@@ -867,9 +878,9 @@ export default function Dashboard() {
         {/* CCI CHART */}
         {hasCci && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>CCI — COMMODITY CHANNEL INDEX (20)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.cci.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>CCI</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (+100)</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-100)</span></span>
@@ -900,9 +911,9 @@ export default function Dashboard() {
         {/* ROC CHART */}
         {hasRoc && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ROC — RATE OF CHANGE (12)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.roc.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ROC</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.border, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Zero Line</span></span>
               </div>
@@ -924,9 +935,9 @@ export default function Dashboard() {
         {/* WILLIAMS %R CHART */}
         {hasWilliamsR && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>WILLIAMS %R (14)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.williamsR.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%R</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (-20)</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-80)</span></span>
@@ -950,9 +961,9 @@ export default function Dashboard() {
         {/* STOCHASTIC RSI CHART */}
         {hasStochRsi && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>STOCHASTIC RSI (14,14,3,3)</div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.stochRsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%K</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%D</span></span>
                 <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (0.8)</span></span>
