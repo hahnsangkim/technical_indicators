@@ -36,6 +36,7 @@ const INDICATORS = {
   williamsR: { label: "%R", desc: "Williams %R (14)", color: "#f8a5c2" },
   stochRsi: { label: "StochRSI", desc: "Stochastic RSI (14,14,3,3)", color: "#f9ca24" },
   ichimoku: { label: "Ichimoku", desc: "Ichimoku Cloud (9, 26, 52)", color: "#a29bfe" },
+  confluence: { label: "Confluence", desc: "Volume Confluence (DeMark + OBV)", color: "#ff6b6b" },
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -314,11 +315,17 @@ export default function Dashboard() {
     for (const k of Object.keys(INDICATORS)) {
       const data = indicatorData[k];
       if (!data) { result[k] = []; continue; }
-      const n = map[range] || data.length;
-      result[k] = data.slice(-n);
+      if (k === "confluence") {
+        // Sparse event data — filter by date instead of slicing by count
+        const startDate = filtered.length > 0 ? filtered[0].date : "";
+        result[k] = data.filter(d => d.date >= startDate);
+      } else {
+        const n = map[range] || data.length;
+        result[k] = data.slice(-n);
+      }
     }
     return result;
-  }, [indicatorData, range]);
+  }, [indicatorData, range, filtered]);
 
   // Merge risk line and Bollinger data into price data for chart overlay (must be before early returns — hooks rule)
   const priceWithRisk = useMemo(() => {
@@ -549,6 +556,11 @@ export default function Dashboard() {
   const hasIchimoku = activeIndicators.includes("ichimoku") && filteredData.ichimoku.length > 0;
   const ichimokuLatest = hasIchimoku ? filteredData.ichimoku[filteredData.ichimoku.length - 1] : null;
 
+  // Confluence stats
+  const hasConfluence = activeIndicators.includes("confluence") && filteredData.confluence && filteredData.confluence.length > 0;
+  const confluenceEvents = hasConfluence ? filteredData.confluence : [];
+  const lastConfluence = confluenceEvents.length > 0 ? confluenceEvents[confluenceEvents.length - 1] : null;
+
   // Combined signal badge
   const ichimokuBullish = hasIchimoku && ichimokuLatest.senkouA !== null && ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB) && ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null && ichimokuLatest.tenkan > ichimokuLatest.kijun;
   const ichimokuBearish = hasIchimoku && ichimokuLatest.senkouA !== null && ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB) && ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null && ichimokuLatest.tenkan < ichimokuLatest.kijun;
@@ -635,6 +647,12 @@ export default function Dashboard() {
     kpis.push({ label: "CLOUD", value: cloudPos, color: cloudColor, sub: `Tenkan: ${ichimokuLatest.tenkan || "\u2014"}` });
     const tkCross = ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null ? (ichimokuLatest.tenkan > ichimokuLatest.kijun ? "BULLISH" : "BEARISH") : "\u2014";
     kpis.push({ label: "TK CROSS", value: tkCross, color: tkCross === "BULLISH" ? T.lime : tkCross === "BEARISH" ? T.red : T.sub, sub: `Kijun: ${ichimokuLatest.kijun || "\u2014"}` });
+  }
+  if (hasConfluence) {
+    kpis.push({ label: "CONFLUENCE", value: `${confluenceEvents.length}`, color: INDICATORS.confluence.color, sub: "total events" });
+    if (lastConfluence) {
+      kpis.push({ label: "LAST EVENT", value: lastConfluence.type.replace(/_/g, " "), color: lastConfluence.type === "CAPITULATION" ? T.red : lastConfluence.type === "OBV_DIVERGENCE" ? T.purple : T.gold, sub: lastConfluence.date });
+    }
   }
 
   return (
@@ -873,6 +891,36 @@ export default function Dashboard() {
                 <Line yAxisId="countdown" type="stepAfter" dataKey="countdownCount" stroke={T.gold} strokeWidth={2} dot={false} name="Countdown" />
               </ComposedChart>
             </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* CONFLUENCE EVENTS */}
+        {hasConfluence && confluenceEvents.length > 0 && (
+          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>VOLUME CONFLUENCE — DEMARK + OBV</div>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.red, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Capitulation</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.purple, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV Divergence</span></span>
+                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.gold, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Post-Signal</span></span>
+              </div>
+            </div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {confluenceEvents.map((evt, i) => {
+                const evtColor = evt.type === "CAPITULATION" ? T.red : evt.type === "OBV_DIVERGENCE" ? T.purple : T.gold;
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
+                    <span style={{ display: "inline-block", width: 8, height: 8, background: evtColor, borderRadius: "50%", flexShrink: 0 }}></span>
+                    <span style={{ color: T.sub, fontSize: 11, minWidth: 80 }}>{evt.date}</span>
+                    <span style={{ color: T.text, fontSize: 11, fontWeight: 600 }}>{evt.type.replace(/_/g, " ")}</span>
+                    <span style={{ color: T.sub, fontSize: 11 }}>{evt.signal.replace(/_/g, " ")}</span>
+                    {evt.type === "CAPITULATION" && <span style={{ color: T.red, fontSize: 11, marginLeft: "auto" }}>{evt.volumeRatio}x vol</span>}
+                    {evt.type === "POST_SIGNAL" && <span style={{ color: evt.validation === "CONFIRMED" ? T.lime : T.red, fontSize: 11, marginLeft: "auto" }}>{evt.validation}</span>}
+                    {evt.type === "OBV_DIVERGENCE" && <span style={{ color: T.purple, fontSize: 11, marginLeft: "auto" }}>price {evt.priceDirection} / OBV {evt.obvDirection}</span>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
