@@ -914,58 +914,93 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* CONFLUENCE EVENTS + STATS */}
-        {hasConfluence && (
-          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
-            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>VOLUME CONFLUENCE — DEMARK + OBV</div>
-                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.red, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Capitulation</span></span>
-                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.purple, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV Divergence</span></span>
-                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.gold, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Post-Signal</span></span>
+        {/* CONFLUENCE CHART + STATS */}
+        {hasConfluence && (() => {
+          const confByDate = {};
+          for (const evt of confluenceEvents) confByDate[evt.date] = evt;
+          const confChartData = filtered.map(row => ({
+            date: row.date, close: row.close,
+            _conf: confByDate[row.date] || null,
+          }));
+          return (
+            <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+              <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>VOLUME CONFLUENCE — DEMARK + OBV</div>
+                  <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                    <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.red, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Capitulation</span></span>
+                    <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.purple, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV Divergence</span></span>
+                    <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.gold, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Post-Signal</span></span>
+                  </div>
                 </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <ComposedChart data={confChartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="confGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={INDICATORS.confluence.color} stopOpacity={0.15} />
+                        <stop offset="100%" stopColor={INDICATORS.confluence.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                      tickFormatter={d => d.slice(5)} interval={Math.floor(filtered.length / 6)} />
+                    <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
+                      tickFormatter={v => `$${v}`} width={50} />
+                    <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                      labelStyle={{ color: T.sub }} />
+                    <Area type="monotone" dataKey="close" stroke={T.muted} fill="url(#confGrad)" strokeWidth={1} dot={({ cx, cy, payload }) => {
+                      if (!payload || !payload._conf) return null;
+                      const evt = payload._conf;
+                      const color = evt.type === "CAPITULATION" ? T.red : evt.type === "OBV_DIVERGENCE" ? T.purple : T.gold;
+                      const label = evt.type === "CAPITULATION" ? "CAP" : evt.type === "OBV_DIVERGENCE" ? "DIV" : evt.validation === "CONFIRMED" ? "OK" : "FAIL";
+                      return (
+                        <g key={`conf-${payload.date}`}>
+                          <circle cx={cx} cy={cy} r={6} fill={color} stroke="#fff" strokeWidth={1.5} />
+                          <text x={cx} y={cy - 12} textAnchor="middle" fill={color} fontSize={9} fontWeight={700} fontFamily="monospace">{label}</text>
+                        </g>
+                      );
+                    }} name="Close" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+                {/* Event list below chart */}
+                {confluenceEvents.length > 0 && (
+                  <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                    {confluenceEvents.map((evt, i) => {
+                      const evtColor = evt.type === "CAPITULATION" ? T.red : evt.type === "OBV_DIVERGENCE" ? T.purple : T.gold;
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 10px", background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
+                          <span style={{ display: "inline-block", width: 8, height: 8, background: evtColor, borderRadius: "50%", flexShrink: 0 }}></span>
+                          <span style={{ color: T.sub, fontSize: 11, minWidth: 72, fontFamily: "monospace" }}>{evt.date}</span>
+                          <span style={{ color: T.text, fontSize: 11, fontWeight: 600 }}>{evt.type.replace(/_/g, " ")}</span>
+                          <span style={{ color: T.sub, fontSize: 11 }}>{evt.signal.replace(/_/g, " ")}</span>
+                          {evt.type === "CAPITULATION" && <span style={{ color: T.red, fontSize: 11, marginLeft: "auto" }}>{evt.volumeRatio}x vol</span>}
+                          {evt.type === "POST_SIGNAL" && <span style={{ color: evt.validation === "CONFIRMED" ? T.lime : T.red, fontSize: 11, marginLeft: "auto" }}>{evt.validation}</span>}
+                          {evt.type === "OBV_DIVERGENCE" && <span style={{ color: T.purple, fontSize: 11, marginLeft: "auto" }}>price {evt.priceDirection} / OBV {evt.obvDirection}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {confluenceEvents.length > 0 ? (
-                <div style={{ display: "grid", gap: 8 }}>
-                  {confluenceEvents.map((evt, i) => {
-                    const evtColor = evt.type === "CAPITULATION" ? T.red : evt.type === "OBV_DIVERGENCE" ? T.purple : T.gold;
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
-                        <span style={{ display: "inline-block", width: 8, height: 8, background: evtColor, borderRadius: "50%", flexShrink: 0 }}></span>
-                        <span style={{ color: T.sub, fontSize: 12, minWidth: 80 }}>{evt.date}</span>
-                        <span style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>{evt.type.replace(/_/g, " ")}</span>
-                        <span style={{ color: T.sub, fontSize: 12 }}>{evt.signal.replace(/_/g, " ")}</span>
-                        {evt.type === "CAPITULATION" && <span style={{ color: T.red, fontSize: 12, marginLeft: "auto" }}>{evt.volumeRatio}x vol</span>}
-                        {evt.type === "POST_SIGNAL" && <span style={{ color: evt.validation === "CONFIRMED" ? T.lime : T.red, fontSize: 12, marginLeft: "auto" }}>{evt.validation}</span>}
-                        {evt.type === "OBV_DIVERGENCE" && <span style={{ color: T.purple, fontSize: 12, marginLeft: "auto" }}>price {evt.priceDirection} / OBV {evt.obvDirection}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ color: T.muted, fontSize: 12, padding: "20px 0", textAlign: "center" }}>No confluence events in selected range</div>
-              )}
+              <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>CONFLUENCE STATISTICS</div>
+                {[
+                  ["Total Events", `${confluenceEvents.length}`, INDICATORS.confluence.color],
+                  ["Capitulations", `${confluenceEvents.filter(e => e.type === "CAPITULATION").length}`, T.red],
+                  ["OBV Divergences", `${confluenceEvents.filter(e => e.type === "OBV_DIVERGENCE").length}`, T.purple],
+                  ["Post-Signal", `${confluenceEvents.filter(e => e.type === "POST_SIGNAL").length}`, T.gold],
+                  ["Confirmed", `${confluenceEvents.filter(e => e.validation === "CONFIRMED").length}`, T.lime],
+                  ["Failed", `${confluenceEvents.filter(e => e.validation === "FAILED").length}`, T.red],
+                  ["Last Event", lastConfluence ? lastConfluence.type.replace(/_/g, " ") : "—", lastConfluence ? (lastConfluence.type === "CAPITULATION" ? T.red : lastConfluence.type === "OBV_DIVERGENCE" ? T.purple : T.gold) : T.muted],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>CONFLUENCE STATISTICS</div>
-              {[
-                ["Total Events", `${confluenceEvents.length}`, INDICATORS.confluence.color],
-                ["Capitulations", `${confluenceEvents.filter(e => e.type === "CAPITULATION").length}`, T.red],
-                ["OBV Divergences", `${confluenceEvents.filter(e => e.type === "OBV_DIVERGENCE").length}`, T.purple],
-                ["Post-Signal", `${confluenceEvents.filter(e => e.type === "POST_SIGNAL").length}`, T.gold],
-                ["Confirmed", `${confluenceEvents.filter(e => e.validation === "CONFIRMED").length}`, T.lime],
-                ["Failed", `${confluenceEvents.filter(e => e.validation === "FAILED").length}`, T.red],
-                ["Last Event", lastConfluence ? lastConfluence.type.replace(/_/g, " ") : "—", lastConfluence ? (lastConfluence.type === "CAPITULATION" ? T.red : lastConfluence.type === "OBV_DIVERGENCE" ? T.purple : T.gold) : T.muted],
-              ].map(([label, value, color]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* RSI CHART + STATS */}
         {hasRsi && (
