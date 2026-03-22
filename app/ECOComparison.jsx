@@ -423,12 +423,6 @@ export default function Dashboard() {
               <div style={{ ...skelStyle, width: 160, height: 36 }} />
               <div style={{ ...skelStyle, width: 120, height: 36, marginLeft: "auto" }} />
             </div>
-            {/* KPI cards skeleton */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-              {[...Array(4)].map((_, i) => (
-                <div key={i} style={{ ...skelStyle, height: 72 }} />
-              ))}
-            </div>
             {/* Chart skeleton */}
             <div style={{ ...skelStyle, height: 340, marginBottom: 20 }} />
             {/* Stats skeleton */}
@@ -612,94 +606,6 @@ export default function Dashboard() {
   const sigColor = hasEco ? (ecoBull ? T.lime : T.red) : hasObv ? (obvTrend === "BULLISH" ? T.lime : T.red) : hasRsi ? (rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub) : hasMacd ? (macdBull ? T.lime : T.red) : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? T.red : bollingerLatest.close < bollingerLatest.lower ? T.lime : T.sub) : hasAtr ? T.sub : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? T.lime : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? T.red : T.sub) : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub) : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? T.lime : T.red) : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub) : hasStochRsi && stochRsiLatest.k !== null ? (stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub) : hasIchimoku ? (ichimokuBullish ? T.lime : ichimokuBearish ? T.red : T.sub) : T.muted;
   const sigLabel = hasEco ? (ecoBull ? "▲ BULLISH" : "▼ BEARISH") : hasObv ? (obvTrend === "BULLISH" ? "▲ BULLISH" : "▼ BEARISH") : hasRsi ? (rsiLatest.rsi > 70 ? "▼ OVERBOUGHT" : rsiLatest.rsi < 30 ? "▲ OVERSOLD" : "— NEUTRAL") : hasMacd ? (macdBull ? "▲ BULLISH" : "▼ BEARISH") : hasBollinger && bollingerLatest.upper !== null ? (bollingerLatest.close > bollingerLatest.upper ? "▼ ABOVE BAND" : bollingerLatest.close < bollingerLatest.lower ? "▲ BELOW BAND" : "— WITHIN BANDS") : hasAtr ? "— VOLATILITY" : hasAdx && adxLatest.adx !== null ? (adxLatest.plusDI > adxLatest.minusDI && adxLatest.adx > 25 ? "▲ BULLISH" : adxLatest.plusDI < adxLatest.minusDI && adxLatest.adx > 25 ? "▼ BEARISH" : "— WEAK TREND") : hasCci && cciLatest.cci !== null ? (cciLatest.cci > 100 ? "▼ OVERBOUGHT" : cciLatest.cci < -100 ? "▲ OVERSOLD" : "— NEUTRAL") : hasRoc && rocLatest.roc !== null ? (rocLatest.roc > 0 ? "▲ BULLISH" : "▼ BEARISH") : hasWilliamsR && williamsRLatest.williamsR !== null ? (williamsRLatest.williamsR > -20 ? "▼ OVERBOUGHT" : williamsRLatest.williamsR < -80 ? "▲ OVERSOLD" : "— NEUTRAL") : hasStochRsi && stochRsiLatest.k !== null ? (stochRsiLatest.k > 0.8 ? "▼ OVERBOUGHT" : stochRsiLatest.k < 0.2 ? "▲ OVERSOLD" : "— NEUTRAL") : hasIchimoku ? (ichimokuBullish ? "▲ BULLISH" : ichimokuBearish ? "▼ BEARISH" : "— NEUTRAL") : "—";
 
-  // KPI cards
-  const kpis = [];
-  kpis.push({ label: "CLOSE", value: `$${latest.close.toFixed(2)}`, color: T.text, sub: latest.date });
-  if (hasEco) {
-    kpis.push({ label: "ECO", value: ecoLatest.eco.toFixed(2), color: T.cyan, sub: `Signal: ${ecoLatest.signal.toFixed(2)}` });
-    kpis.push({ label: "ECO HIST", value: ecoLatest.histogram.toFixed(2), color: ecoLatest.histogram > 0 ? T.lime : T.red, sub: `${ecoCrossovers} crossovers` });
-  }
-  if (hasObv) {
-    kpis.push({ label: "OBV", value: fmtVol(obvLatest.obv), color: T.purple, sub: `EMA: ${fmtVol(obvLatest.obvEma)}` });
-    kpis.push({ label: "OBV TREND", value: obvTrend, color: obvTrend === "BULLISH" ? T.lime : T.red, sub: `vs EMA(20)` });
-  }
-  if (hasDemark) {
-    const setupVal = demarkLatest.setupCount === 0 ? "—" : `${demarkLatest.setupType === "sell" ? "S" : "B"} ${Math.abs(demarkLatest.setupCount)}`;
-    kpis.push({ label: "TD SETUP", value: setupVal, color: T.gold, sub: demarkLatest.setupType ? `${demarkLatest.setupType} phase` : "inactive" });
-    const lastSigLabel = lastDemarkSignal ? lastDemarkSignal.signal.replace(/_/g, " ") : "None";
-    const lastSigColor = lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted;
-    kpis.push({ label: "LAST SIGNAL", value: lastSigLabel, color: lastSigColor, sub: lastDemarkSignal?.date || "—" });
-    if (currentRiskLine) {
-      kpis.push({ label: "RISK LINE", value: `$${currentRiskLine}`, color: T.red, sub: `${currentRiskLineType} stop-loss` });
-    }
-  }
-  if (hasRsi) {
-    const rsiStatus = rsiLatest.rsi > 70 ? "OVERBOUGHT" : rsiLatest.rsi < 30 ? "OVERSOLD" : "NEUTRAL";
-    const rsiColor = rsiLatest.rsi > 70 ? T.red : rsiLatest.rsi < 30 ? T.lime : T.sub;
-    kpis.push({ label: "RSI", value: rsiLatest.rsi.toFixed(1), color: INDICATORS.rsi.color, sub: `Period: 14` });
-    kpis.push({ label: "RSI STATUS", value: rsiStatus, color: rsiColor, sub: rsiLatest.rsi > 70 ? "Above 70" : rsiLatest.rsi < 30 ? "Below 30" : "30-70 range" });
-  }
-  if (hasMacd) {
-    kpis.push({ label: "MACD", value: macdLatest.macd.toFixed(2), color: INDICATORS.macd.color, sub: `Signal: ${macdLatest.signal.toFixed(2)}` });
-    kpis.push({ label: "MACD HIST", value: macdLatest.histogram.toFixed(2), color: macdLatest.histogram > 0 ? T.lime : T.red, sub: `${macdCrossovers} crossovers` });
-  }
-  if (hasBollinger && bollingerLatest.upper !== null) {
-    const bandwidth = ((bollingerLatest.upper - bollingerLatest.lower) / bollingerLatest.middle * 100);
-    const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
-    kpis.push({ label: "BB WIDTH", value: bandwidth.toFixed(1) + "%", color: INDICATORS.bollinger.color, sub: `Upper: $${bollingerLatest.upper}` });
-    kpis.push({ label: "%B", value: percentB.toFixed(1) + "%", color: percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub, sub: `Lower: $${bollingerLatest.lower}` });
-  }
-  if (hasAtr && atrLatest.atr !== null) {
-    const atrPct = (atrLatest.atr / atrLatest.close * 100);
-    kpis.push({ label: "ATR", value: atrLatest.atr.toFixed(2), color: INDICATORS.atr.color, sub: `Period: 14` });
-    kpis.push({ label: "ATR %", value: atrPct.toFixed(2) + "%", color: INDICATORS.atr.color, sub: `% of close price` });
-  }
-  if (hasAdx && adxLatest.adx !== null) {
-    const trendStrength = adxLatest.adx > 50 ? "VERY STRONG" : adxLatest.adx > 25 ? "STRONG" : "WEAK";
-    const trendColor = adxLatest.adx > 25 ? T.lime : T.sub;
-    kpis.push({ label: "ADX", value: adxLatest.adx.toFixed(1), color: INDICATORS.adx.color, sub: trendStrength });
-    kpis.push({ label: "+DI / -DI", value: `${adxLatest.plusDI.toFixed(1)} / ${adxLatest.minusDI.toFixed(1)}`, color: adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red, sub: adxLatest.plusDI > adxLatest.minusDI ? "Bullish" : "Bearish" });
-  }
-  if (hasCci && cciLatest.cci !== null) {
-    const cciStatus = cciLatest.cci > 100 ? "OVERBOUGHT" : cciLatest.cci < -100 ? "OVERSOLD" : "NEUTRAL";
-    const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
-    kpis.push({ label: "CCI", value: cciLatest.cci.toFixed(1), color: INDICATORS.cci.color, sub: `Period: 20` });
-    kpis.push({ label: "CCI STATUS", value: cciStatus, color: cciStatusColor, sub: cciLatest.cci > 100 ? "Above +100" : cciLatest.cci < -100 ? "Below -100" : "-100 to +100" });
-  }
-  if (hasRoc && rocLatest.roc !== null) {
-    const rocDirection = rocLatest.roc > 0 ? "POSITIVE" : "NEGATIVE";
-    const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
-    kpis.push({ label: "ROC", value: rocLatest.roc.toFixed(2), color: INDICATORS.roc.color, sub: `Period: 12` });
-    kpis.push({ label: "MOMENTUM", value: rocDirection, color: rocDirColor, sub: rocLatest.roc > 0 ? "Above zero" : "Below zero" });
-  }
-  if (hasWilliamsR && williamsRLatest.williamsR !== null) {
-    const wrStatus = williamsRLatest.williamsR > -20 ? "OVERBOUGHT" : williamsRLatest.williamsR < -80 ? "OVERSOLD" : "NEUTRAL";
-    const wrStatusColor = williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub;
-    kpis.push({ label: "%R", value: williamsRLatest.williamsR.toFixed(1), color: INDICATORS.williamsR.color, sub: `Period: 14` });
-    kpis.push({ label: "%R STATUS", value: wrStatus, color: wrStatusColor, sub: williamsRLatest.williamsR > -20 ? "Above -20" : williamsRLatest.williamsR < -80 ? "Below -80" : "-80 to -20" });
-  }
-  if (hasStochRsi && stochRsiLatest.k !== null) {
-    const srZone = stochRsiLatest.k > 0.8 ? "OVERBOUGHT" : stochRsiLatest.k < 0.2 ? "OVERSOLD" : "NEUTRAL";
-    const srZoneColor = stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub;
-    kpis.push({ label: "%K", value: stochRsiLatest.k.toFixed(4), color: INDICATORS.stochRsi.color, sub: `%D: ${stochRsiLatest.d.toFixed(4)}` });
-    kpis.push({ label: "ZONE", value: srZone, color: srZoneColor, sub: stochRsiLatest.k > 0.8 ? "Above 0.8" : stochRsiLatest.k < 0.2 ? "Below 0.2" : "0.2 to 0.8" });
-  }
-  if (hasIchimoku && ichimokuLatest.senkouA !== null) {
-    const aboveCloud = ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
-    const belowCloud = ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
-    const cloudPos = aboveCloud ? "ABOVE CLOUD" : belowCloud ? "BELOW CLOUD" : "IN CLOUD";
-    const cloudColor = aboveCloud ? T.lime : belowCloud ? T.red : T.gold;
-    kpis.push({ label: "CLOUD", value: cloudPos, color: cloudColor, sub: `Tenkan: ${ichimokuLatest.tenkan || "\u2014"}` });
-    const tkCross = ichimokuLatest.tenkan !== null && ichimokuLatest.kijun !== null ? (ichimokuLatest.tenkan > ichimokuLatest.kijun ? "BULLISH" : "BEARISH") : "\u2014";
-    kpis.push({ label: "TK CROSS", value: tkCross, color: tkCross === "BULLISH" ? T.lime : tkCross === "BEARISH" ? T.red : T.sub, sub: `Kijun: ${ichimokuLatest.kijun || "\u2014"}` });
-  }
-  if (hasConfluence) {
-    kpis.push({ label: "CONFLUENCE", value: `${confluenceEvents.length}`, color: INDICATORS.confluence.color, sub: "total events" });
-    if (lastConfluence) {
-      kpis.push({ label: "LAST EVENT", value: lastConfluence.type.replace(/_/g, " "), color: lastConfluence.type === "CAPITULATION" ? T.red : lastConfluence.type === "OBV_DIVERGENCE" ? T.purple : T.gold, sub: lastConfluence.date });
-    }
-  }
-
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", color: T.text }}>
       <style>{`
@@ -710,7 +616,6 @@ export default function Dashboard() {
         @media (max-width: 768px) {
           .header-bar { flex-direction: column !important; gap: 10px !important; align-items: flex-start !important; }
           .header-right { flex-wrap: wrap !important; }
-          .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
           .chart-legend { flex-wrap: wrap !important; gap: 6px !important; }
           .chart-header { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
           .stats-grid { grid-template-columns: 1fr !important; }
@@ -718,8 +623,6 @@ export default function Dashboard() {
           .chart-stats-row .stats-sidebar { width: 100% !important; }
         }
         @media (max-width: 480px) {
-          .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .kpi-value { font-size: 16px !important; }
         }
       `}</style>
 
@@ -747,10 +650,10 @@ export default function Dashboard() {
         <div className="header-bar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.2em" }}>TECHNICAL INDICATORS</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.2em" }}>TECHNICAL INDICATORS</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
                 {tickers.length > 0 && <TickerSearch tickers={tickers} selected={ticker} onSelect={setTicker} />}
-                <span style={{ color: T.muted, fontSize: 11 }}>{primaryData.length} bars</span>
+                <span style={{ color: T.sub, fontSize: 12 }}>{primaryData.length} bars</span>
               </div>
             </div>
           </div>
@@ -771,7 +674,7 @@ export default function Dashboard() {
                 <button key={r} onClick={() => setRange(r)} style={{
                   padding: "5px 10px", borderRadius: 5, border: `1px solid ${range === r ? T.cyan : T.border}`,
                   background: range === r ? `${T.cyan}18` : "transparent",
-                  color: range === r ? T.cyan : T.sub, fontSize: 10, fontWeight: 700,
+                  color: range === r ? T.cyan : T.sub, fontSize: 12, fontWeight: 700,
                   cursor: "pointer", letterSpacing: "0.08em"
                 }}>{r}</button>
               ))}
@@ -782,30 +685,19 @@ export default function Dashboard() {
 
       <div style={{ padding: "16px", maxWidth: 1200, margin: "0 auto" }}>
 
-        {/* KPI CARDS */}
-        <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(120px, 1fr))`, gap: 10, marginBottom: 14 }}>
-          {kpis.map(({ label, value, color, sub }) => (
-            <div key={label} style={{ padding: "12px 14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, textAlign: "center" }}>
-              <div style={{ fontSize: 9, color: T.muted, letterSpacing: "0.14em", marginBottom: 6 }}>{label}</div>
-              <div className="kpi-value" style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "-0.03em", lineHeight: 1, wordBreak: "break-all" }}>{value}</div>
-              <div style={{ fontSize: 9, color: T.sub, marginTop: 5 }}>{sub}</div>
-            </div>
-          ))}
-        </div>
-
         {/* PRICE CHART */}
         <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
           <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
+            <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
             <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
               {hasDemark && currentRiskLine && (
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
+                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
               )}
               {hasBollinger && (
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
+                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
               )}
               {hasIchimoku && (
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Ichimoku</span></span>
+                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Ichimoku</span></span>
               )}
             </div>
           </div>
@@ -850,11 +742,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ECO — DEMA + VOLUME-WEIGHTED</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>ECO — DEMA + VOLUME-WEIGHTED</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ECO</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ECO</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -876,7 +768,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
               {[
                 ["Method", "DEMA + Vol-Weighted", T.cyan],
                 ["Current ECO", ecoLatest.eco.toFixed(2), T.cyan],
@@ -887,8 +779,8 @@ export default function Dashboard() {
                 ["Crossovers", `${ecoCrossovers}`, T.purple],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -900,10 +792,10 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ON-BALANCE VOLUME (OBV)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>ON-BALANCE VOLUME (OBV)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>EMA(20)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>EMA(20)</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -927,7 +819,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>OBV STATISTICS</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>OBV STATISTICS</div>
               {[
                 ["Method", "Cumulative Volume", T.purple],
                 ["Current OBV", fmtVol(obvLatest.obv), T.purple],
@@ -938,8 +830,8 @@ export default function Dashboard() {
                 ["OBV vs EMA", fmtVol(obvLatest.obv - obvLatest.obvEma), obvLatest.obv > obvLatest.obvEma ? T.lime : T.red],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -951,11 +843,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>TD SEQUENTIAL — SETUP &amp; COUNTDOWN</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>TD SEQUENTIAL — SETUP &amp; COUNTDOWN</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Buy Setup</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Sell Setup</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Countdown</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Buy Setup</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Sell Setup</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Countdown</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -984,7 +876,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>DEMARK STATISTICS</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>DEMARK STATISTICS</div>
               {[
                 ["Method", "TD Sequential", T.gold],
                 ["Setup Phase", demarkLatest.setupType ? `${demarkLatest.setupType} (${Math.abs(demarkLatest.setupCount)}/9)` : "Inactive", demarkLatest.setupType === "buy" ? T.lime : demarkLatest.setupType === "sell" ? T.red : T.muted],
@@ -996,8 +888,8 @@ export default function Dashboard() {
                 ["Risk Line", currentRiskLine ? `$${currentRiskLine} (${currentRiskLineType})` : "Inactive", currentRiskLine ? T.red : T.muted],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -1008,11 +900,11 @@ export default function Dashboard() {
         {hasConfluence && confluenceEvents.length > 0 && (
           <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
             <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>VOLUME CONFLUENCE — DEMARK + OBV</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>VOLUME CONFLUENCE — DEMARK + OBV</div>
               <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.red, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Capitulation</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.purple, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV Divergence</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.gold, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Post-Signal</span></span>
+                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.red, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Capitulation</span></span>
+                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.purple, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV Divergence</span></span>
+                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 8, height: 8, background: T.gold, borderRadius: "50%", marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Post-Signal</span></span>
               </div>
             </div>
             <div style={{ display: "grid", gap: 8 }}>
@@ -1021,12 +913,12 @@ export default function Dashboard() {
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
                     <span style={{ display: "inline-block", width: 8, height: 8, background: evtColor, borderRadius: "50%", flexShrink: 0 }}></span>
-                    <span style={{ color: T.sub, fontSize: 11, minWidth: 80 }}>{evt.date}</span>
-                    <span style={{ color: T.text, fontSize: 11, fontWeight: 600 }}>{evt.type.replace(/_/g, " ")}</span>
-                    <span style={{ color: T.sub, fontSize: 11 }}>{evt.signal.replace(/_/g, " ")}</span>
-                    {evt.type === "CAPITULATION" && <span style={{ color: T.red, fontSize: 11, marginLeft: "auto" }}>{evt.volumeRatio}x vol</span>}
-                    {evt.type === "POST_SIGNAL" && <span style={{ color: evt.validation === "CONFIRMED" ? T.lime : T.red, fontSize: 11, marginLeft: "auto" }}>{evt.validation}</span>}
-                    {evt.type === "OBV_DIVERGENCE" && <span style={{ color: T.purple, fontSize: 11, marginLeft: "auto" }}>price {evt.priceDirection} / OBV {evt.obvDirection}</span>}
+                    <span style={{ color: T.sub, fontSize: 12, minWidth: 80 }}>{evt.date}</span>
+                    <span style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>{evt.type.replace(/_/g, " ")}</span>
+                    <span style={{ color: T.sub, fontSize: 12 }}>{evt.signal.replace(/_/g, " ")}</span>
+                    {evt.type === "CAPITULATION" && <span style={{ color: T.red, fontSize: 12, marginLeft: "auto" }}>{evt.volumeRatio}x vol</span>}
+                    {evt.type === "POST_SIGNAL" && <span style={{ color: evt.validation === "CONFIRMED" ? T.lime : T.red, fontSize: 12, marginLeft: "auto" }}>{evt.validation}</span>}
+                    {evt.type === "OBV_DIVERGENCE" && <span style={{ color: T.purple, fontSize: 12, marginLeft: "auto" }}>price {evt.priceDirection} / OBV {evt.obvDirection}</span>}
                   </div>
                 );
               })}
@@ -1039,11 +931,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.rsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>RSI</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (70)</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (30)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.rsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>RSI</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (70)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (30)</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1061,7 +953,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>RSI STATISTICS</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>RSI STATISTICS</div>
               {[
                 ["Method", "Wilder's RSI", INDICATORS.rsi.color],
                 ["Current RSI", rsiLatest.rsi.toFixed(2), INDICATORS.rsi.color],
@@ -1073,8 +965,8 @@ export default function Dashboard() {
                 ["Oversold Bars", `${rsiOversoldBars} / ${filteredData.rsi.length}`, T.lime],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -1086,11 +978,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>MACD — EMA(12, 26, 9)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>MACD — EMA(12, 26, 9)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.macd.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>MACD</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.macd.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>MACD</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1112,7 +1004,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
             <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>MACD STATISTICS</div>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>MACD STATISTICS</div>
               {[
                 ["Method", "EMA(12, 26, 9)", INDICATORS.macd.color],
                 ["Current MACD", macdLatest.macd.toFixed(4), INDICATORS.macd.color],
@@ -1122,8 +1014,8 @@ export default function Dashboard() {
                 ["Crossovers", `${macdCrossovers}`, T.purple],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -1135,9 +1027,9 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ATR — AVERAGE TRUE RANGE (14)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>ATR — AVERAGE TRUE RANGE (14)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.atr.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ATR</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.atr.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ATR</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={180}>
@@ -1157,7 +1049,7 @@ export default function Dashboard() {
               const volatilityColor = atrPct > 3 ? T.red : atrPct > 1.5 ? T.gold : T.lime;
               return (
                 <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ATR STATISTICS</div>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ATR STATISTICS</div>
                   {[
                     ["Method", "Wilder's ATR (14)", INDICATORS.atr.color],
                     ["Current ATR", atrLatest.atr.toFixed(4), INDICATORS.atr.color],
@@ -1168,8 +1060,8 @@ export default function Dashboard() {
                     ["Volatility", volatilityLevel, volatilityColor],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -1183,11 +1075,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ADX — AVERAGE DIRECTIONAL INDEX (14)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>ADX — AVERAGE DIRECTIONAL INDEX (14)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.adx.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ADX</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>+DI</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>-DI</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.adx.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ADX</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>+DI</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>-DI</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1211,7 +1103,7 @@ export default function Dashboard() {
               const directionalColor = adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red;
               return (
                 <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ADX STATISTICS</div>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ADX STATISTICS</div>
                   {[
                     ["Method", "Wilder's ADX (14)", INDICATORS.adx.color],
                     ["ADX Value", adxLatest.adx.toFixed(2), INDICATORS.adx.color],
@@ -1222,8 +1114,8 @@ export default function Dashboard() {
                     ["ADX High", adxMax.toFixed(2), T.cyan],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -1237,11 +1129,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>CCI — COMMODITY CHANNEL INDEX (20)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>CCI — COMMODITY CHANNEL INDEX (20)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.cci.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>CCI</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (+100)</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-100)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.cci.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>CCI</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (+100)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-100)</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1269,7 +1161,7 @@ export default function Dashboard() {
               const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
               return (
                 <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>CCI STATISTICS</div>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>CCI STATISTICS</div>
                   {[
                     ["Method", "Typical Price CCI (20)", INDICATORS.cci.color],
                     ["Current CCI", cciLatest.cci.toFixed(2), INDICATORS.cci.color],
@@ -1280,8 +1172,8 @@ export default function Dashboard() {
                     ["Oversold Bars", `${cciOversoldBars} / ${filteredData.cci.length}`, T.lime],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -1295,10 +1187,10 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ROC — RATE OF CHANGE (12)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>ROC — RATE OF CHANGE (12)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.roc.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ROC</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.border, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Zero Line</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.roc.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ROC</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.border, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Zero Line</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1318,7 +1210,7 @@ export default function Dashboard() {
               const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
               return (
                 <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ROC STATISTICS</div>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ROC STATISTICS</div>
                   {[
                     ["Method", "Rate of Change (12)", INDICATORS.roc.color],
                     ["Current ROC", rocLatest.roc.toFixed(4), INDICATORS.roc.color],
@@ -1329,8 +1221,8 @@ export default function Dashboard() {
                     ["Negative Bars", `${rocNegativeBars} / ${filteredData.roc.length}`, T.red],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -1344,11 +1236,11 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>WILLIAMS %R (14)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>WILLIAMS %R (14)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.williamsR.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%R</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (-20)</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-80)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.williamsR.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%R</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (-20)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-80)</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1369,7 +1261,7 @@ export default function Dashboard() {
               const wrStatusColor = williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub;
               return (
                 <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>WILLIAMS %R STATISTICS</div>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>WILLIAMS %R STATISTICS</div>
                   {[
                     ["Method", "Williams %R (14)", INDICATORS.williamsR.color],
                     ["Current %R", williamsRLatest.williamsR.toFixed(2), INDICATORS.williamsR.color],
@@ -1380,8 +1272,8 @@ export default function Dashboard() {
                     ["Oversold Bars", `${wrOversoldBars} / ${filteredData.williamsR.length}`, T.lime],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -1395,12 +1287,12 @@ export default function Dashboard() {
           <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>STOCHASTIC RSI (14,14,3,3)</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>STOCHASTIC RSI (14,14,3,3)</div>
                 <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.stochRsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%K</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%D</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (0.8)</span></span>
-                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (0.2)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.stochRsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%K</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%D</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (0.8)</span></span>
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (0.2)</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={220}>
@@ -1423,7 +1315,7 @@ export default function Dashboard() {
               const srZoneColor = stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub;
               return (
                 <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>STOCHRSI STATISTICS</div>
+                  <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>STOCHRSI STATISTICS</div>
                   {[
                     ["Method", "StochRSI (14,14,3,3)", INDICATORS.stochRsi.color],
                     ["Raw StochRSI", stochRsiLatest.stochRsi.toFixed(4), INDICATORS.stochRsi.color],
@@ -1434,8 +1326,8 @@ export default function Dashboard() {
                     ["Oversold Bars", `${srOversoldBars} / ${filteredData.stochRsi.length}`, T.lime],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                      <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                     </div>
                   ))}
                 </div>
@@ -1453,7 +1345,7 @@ export default function Dashboard() {
             const pricePosColor = pricePos === "Above" ? T.red : pricePos === "Below" ? T.lime : T.sub;
             return (
               <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>BOLLINGER STATISTICS</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>BOLLINGER STATISTICS</div>
                 {[
                   ["Method", "SMA(20) ± 2σ", INDICATORS.bollinger.color],
                   ["Upper Band", `$${bollingerLatest.upper}`, INDICATORS.bollinger.color],
@@ -1464,8 +1356,8 @@ export default function Dashboard() {
                   ["Price Position", pricePos, pricePosColor],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                   </div>
                 ))}
               </div>
@@ -1480,7 +1372,7 @@ export default function Dashboard() {
             const tkCrossColor = tkCross === "Bullish" ? T.lime : tkCross === "Bearish" ? T.red : T.sub;
             return (
               <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ICHIMOKU STATISTICS</div>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>ICHIMOKU STATISTICS</div>
                 {[
                   ["Method", "Ichimoku Cloud (9,26,52)", INDICATORS.ichimoku.color],
                   ["Tenkan-sen", ichimokuLatest.tenkan !== null ? `$${ichimokuLatest.tenkan}` : "\u2014", INDICATORS.ichimoku.color],
@@ -1491,8 +1383,8 @@ export default function Dashboard() {
                   ["TK Cross", tkCross, tkCrossColor],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
                   </div>
                 ))}
               </div>

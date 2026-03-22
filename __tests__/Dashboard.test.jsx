@@ -79,16 +79,16 @@ describe("Dashboard", () => {
     expect(screen.getAllByTestId("chart").length).toBeGreaterThan(0);
   });
 
-  it("renders ECO KPI cards when ECO active", async () => {
+  it("renders ECO chart and stats when ECO active", async () => {
     const ecoData = makeMockData((i) => ({ eco: 5.2, signal: 3.1, histogram: 2.1 }));
     global.fetch = mockFetchForIndicator("eco", ecoData);
     render(<Dashboard />);
     await waitFor(() => {
       expect(screen.queryByTestId("loading-skeleton")).not.toBeInTheDocument();
     });
-    // ECO-related KPI labels
-    expect(screen.getByText("CLOSE")).toBeInTheDocument();
+    // ECO chart header and stats should be visible
     expect(screen.getAllByText("ECO").length).toBeGreaterThan(0);
+    expect(screen.getByText("ECO STATISTICS")).toBeInTheDocument();
   });
 
   it("range buttons are visible", async () => {
