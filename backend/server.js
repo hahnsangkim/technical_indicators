@@ -189,16 +189,8 @@ function calcRiskLine(rows, seqBars, type) {
   }
 }
 
-// ─── GET /api/demark?ticker=SPY ───────────────────────────────────────────────
-app.get("/api/demark", (req, res) => {
-  const ticker = validateTicker(req.query.ticker);
-  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
-  const rows = parseRows(ticker);
-
-  if (rows.length === 0) {
-    return res.json({ ticker, data: [] });
-  }
-
+// ─── calcDemark — reusable DeMark calculation ───────────────────────────────
+function calcDemark(rows) {
   let setupCount = 0;   // positive = sell setup, negative = buy setup
   let setupType = null;  // "buy" | "sell" | null
   let countdownCount = 0;
@@ -214,7 +206,7 @@ app.get("/api/demark", (req, res) => {
   // Active risk line — persists until next signal or invalidation
   let activeRiskLine = null; // { value, type: "buy"|"sell" }
 
-  const data = rows.map((row, i) => {
+  return rows.map((row, i) => {
     let setupComplete = false;
     let countdownComplete = false;
     let perfected = false;
@@ -226,6 +218,7 @@ app.get("/api/demark", (req, res) => {
         setupCount: 0, setupType: null, countdownCount: 0, countdownType: null,
         setupComplete: false, countdownComplete: false, perfected: false, signal: null,
         riskLine: null,
+        riskLineType: null,
       };
     }
 
@@ -349,8 +342,15 @@ app.get("/api/demark", (req, res) => {
       riskLineType: activeRiskLine ? activeRiskLine.type : null,
     };
   });
+}
 
-  res.json({ ticker, data });
+// ─── GET /api/demark?ticker=SPY ───────────────────────────────────────────────
+app.get("/api/demark", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcDemark(rows) });
 });
 
 // ─── GET /api/rsi?ticker=SPY ──────────────────────────────────────────────────
@@ -741,4 +741,4 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
-export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows };
+export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows, calcDemark };
