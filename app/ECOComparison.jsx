@@ -685,56 +685,83 @@ export default function Dashboard() {
 
       <div style={{ padding: "16px", maxWidth: 1200, margin: "0 auto" }}>
 
-        {/* PRICE CHART */}
-        <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-          <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
-            <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-              {hasDemark && currentRiskLine && (
-                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
-              )}
-              {hasBollinger && (
-                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
-              )}
-              {hasIchimoku && (
-                <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Ichimoku</span></span>
-              )}
+        {/* PRICE CHART + BOLLINGER STATS */}
+        <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+          <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em" }}>PRICE — {ticker} CLOSE</div>
+              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                {hasDemark && currentRiskLine && (
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Risk Line ${currentRiskLine}</span></span>
+                )}
+                {hasBollinger && (
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.bollinger.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Bollinger</span></span>
+                )}
+                {hasIchimoku && (
+                  <span style={{ fontSize: 11 }}><span style={{ display: "inline-block", width: 10, height: 2, background: INDICATORS.ichimoku.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Ichimoku</span></span>
+                )}
+              </div>
             </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <ComposedChart data={priceWithRisk} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={T.cyan} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={T.cyan} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                  tickFormatter={d => d.slice(5)} interval={Math.floor(filtered.length / 6)} />
+                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
+                  tickFormatter={v => `$${v}`} width={50} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                  labelStyle={{ color: T.sub }} />
+                <Area type="monotone" dataKey="close" stroke={T.cyan} fill="url(#priceGrad)" strokeWidth={1.5} dot={false} name="Close" />
+                {hasDemark && <Line type="stepAfter" dataKey="riskLine" stroke={T.red} strokeWidth={1.5} strokeDasharray="6 3" dot={false} name="Risk Line" connectNulls={false} />}
+                {hasBollinger && (
+                  <>
+                    <Area type="monotone" dataKey="bbUpper" stroke={INDICATORS.bollinger.color} fill="none" strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Upper" />
+                    <Area type="monotone" dataKey="bbLower" stroke={INDICATORS.bollinger.color} fill={`${INDICATORS.bollinger.color}10`} strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Lower" />
+                    <Line type="monotone" dataKey="bbMiddle" stroke={INDICATORS.bollinger.color} strokeWidth={1} strokeDasharray="2 2" dot={false} name="BB Middle" strokeOpacity={0.5} />
+                  </>
+                )}
+                {hasIchimoku && (
+                  <>
+                    <Area type="monotone" dataKey="senkouA" stroke="none" fill={`${INDICATORS.ichimoku.color}20`} dot={false} name="Senkou A" />
+                    <Area type="monotone" dataKey="senkouB" stroke="none" fill={`${INDICATORS.ichimoku.color}10`} dot={false} name="Senkou B" />
+                    <Line type="monotone" dataKey="tenkan" stroke={INDICATORS.ichimoku.color} strokeWidth={1} dot={false} name="Tenkan" />
+                    <Line type="monotone" dataKey="kijun" stroke="#fd79a8" strokeWidth={1} dot={false} name="Kijun" />
+                    <Line type="monotone" dataKey="chikou" stroke={T.lime} strokeWidth={1} strokeDasharray="2 2" dot={false} name="Chikou" strokeOpacity={0.5} />
+                  </>
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <ComposedChart data={priceWithRisk} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={T.cyan} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={T.cyan} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                tickFormatter={d => d.slice(5)} interval={Math.floor(filtered.length / 6)} />
-              <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
-                tickFormatter={v => `$${v}`} width={50} />
-              <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                labelStyle={{ color: T.sub }} />
-              <Area type="monotone" dataKey="close" stroke={T.cyan} fill="url(#priceGrad)" strokeWidth={1.5} dot={false} name="Close" />
-              {hasDemark && <Line type="stepAfter" dataKey="riskLine" stroke={T.red} strokeWidth={1.5} strokeDasharray="6 3" dot={false} name="Risk Line" connectNulls={false} />}
-              {hasBollinger && (
-                <>
-                  <Area type="monotone" dataKey="bbUpper" stroke={INDICATORS.bollinger.color} fill="none" strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Upper" />
-                  <Area type="monotone" dataKey="bbLower" stroke={INDICATORS.bollinger.color} fill={`${INDICATORS.bollinger.color}10`} strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Lower" />
-                  <Line type="monotone" dataKey="bbMiddle" stroke={INDICATORS.bollinger.color} strokeWidth={1} strokeDasharray="2 2" dot={false} name="BB Middle" strokeOpacity={0.5} />
-                </>
-              )}
-              {hasIchimoku && (
-                <>
-                  <Area type="monotone" dataKey="senkouA" stroke="none" fill={`${INDICATORS.ichimoku.color}20`} dot={false} name="Senkou A" />
-                  <Area type="monotone" dataKey="senkouB" stroke="none" fill={`${INDICATORS.ichimoku.color}10`} dot={false} name="Senkou B" />
-                  <Line type="monotone" dataKey="tenkan" stroke={INDICATORS.ichimoku.color} strokeWidth={1} dot={false} name="Tenkan" />
-                  <Line type="monotone" dataKey="kijun" stroke="#fd79a8" strokeWidth={1} dot={false} name="Kijun" />
-                  <Line type="monotone" dataKey="chikou" stroke={T.lime} strokeWidth={1} strokeDasharray="2 2" dot={false} name="Chikou" strokeOpacity={0.5} />
-                </>
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasBollinger && bollingerLatest.upper !== null && (() => {
+            const bandwidth = ((bollingerLatest.upper - bollingerLatest.lower) / bollingerLatest.middle * 100);
+            const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
+            const pricePos = bollingerLatest.close > bollingerLatest.upper ? "Above" : bollingerLatest.close < bollingerLatest.lower ? "Below" : "Within";
+            const pricePosColor = pricePos === "Above" ? T.red : pricePos === "Below" ? T.lime : T.sub;
+            return (
+              <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>BOLLINGER STATISTICS</div>
+                {[
+                  ["Method", "SMA(20) ± 2σ", INDICATORS.bollinger.color],
+                  ["Upper Band", `$${bollingerLatest.upper}`, INDICATORS.bollinger.color],
+                  ["Middle Band", `$${bollingerLatest.middle}`, INDICATORS.bollinger.color],
+                  ["Lower Band", `$${bollingerLatest.lower}`, INDICATORS.bollinger.color],
+                  ["Bandwidth", bandwidth.toFixed(1) + "%", T.cyan],
+                  ["%B", percentB.toFixed(1) + "%", percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub],
+                  ["Price Position", pricePos, pricePosColor],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
+                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* ECO CHART + STATS */}
@@ -1336,33 +1363,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* OVERLAY-ONLY STATS (Bollinger & Ichimoku - no separate charts) */}
+        {/* OVERLAY-ONLY STATS (Ichimoku - no separate chart) */}
         <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-          {hasBollinger && bollingerLatest.upper !== null && (() => {
-            const bandwidth = ((bollingerLatest.upper - bollingerLatest.lower) / bollingerLatest.middle * 100);
-            const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
-            const pricePos = bollingerLatest.close > bollingerLatest.upper ? "Above" : bollingerLatest.close < bollingerLatest.lower ? "Below" : "Within";
-            const pricePosColor = pricePos === "Above" ? T.red : pricePos === "Below" ? T.lime : T.sub;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 12, color: T.sub, letterSpacing: "0.14em", marginBottom: 12 }}>BOLLINGER STATISTICS</div>
-                {[
-                  ["Method", "SMA(20) ± 2σ", INDICATORS.bollinger.color],
-                  ["Upper Band", `$${bollingerLatest.upper}`, INDICATORS.bollinger.color],
-                  ["Middle Band", `$${bollingerLatest.middle}`, INDICATORS.bollinger.color],
-                  ["Lower Band", `$${bollingerLatest.lower}`, INDICATORS.bollinger.color],
-                  ["Bandwidth", bandwidth.toFixed(1) + "%", T.cyan],
-                  ["%B", percentB.toFixed(1) + "%", percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub],
-                  ["Price Position", pricePos, pricePosColor],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 12, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
           {hasIchimoku && ichimokuLatest.senkouA !== null && (() => {
             const aboveCloud = ichimokuLatest.close > Math.max(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
             const belowCloud = ichimokuLatest.close < Math.min(ichimokuLatest.senkouA, ichimokuLatest.senkouB);
