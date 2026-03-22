@@ -306,7 +306,10 @@ export default function Dashboard() {
     setActiveIndicators(prev => {
       if (prev.includes(key)) {
         if (prev.length === 1) return prev; // keep at least one
-        return prev.filter(k => k !== key);
+        const remaining = prev.filter(k => k !== key);
+        // Don't allow confluence as the only indicator (sparse data, no price chart)
+        if (remaining.length === 1 && remaining[0] === "confluence") return prev;
+        return remaining;
       }
       return [...prev, key];
     });
