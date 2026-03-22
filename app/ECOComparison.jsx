@@ -762,6 +762,9 @@ export default function Dashboard() {
               </div>
             );
           })()}
+          {!(hasBollinger && bollingerLatest.upper !== null) && (
+            <div style={{ width: 260, flexShrink: 0 }} />
+          )}
         </div>
 
         {/* ECO CHART + STATS */}
