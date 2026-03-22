@@ -30,7 +30,10 @@ try {
   process.exit(1);
 }
 
+const parseCache = new Map();
+
 function parseRows(ticker) {
+  if (parseCache.has(ticker)) return parseCache.get(ticker);
   const rows = [];
   for (let i = 1; i < csvLines.length; i++) {
     const cols = csvLines[i].split(",");
@@ -45,6 +48,7 @@ function parseRows(ticker) {
     });
   }
   rows.sort((a, b) => a.date.localeCompare(b.date));
+  parseCache.set(ticker, rows);
   return rows;
 }
 
