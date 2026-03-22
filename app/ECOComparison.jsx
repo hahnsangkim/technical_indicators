@@ -75,7 +75,7 @@ function TickerSearch({ tickers, selected, onSelect }) {
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, marginTop: 4,
-          width: 220, maxHeight: 340, background: T.surface,
+          width: 220, maxWidth: "calc(100vw - 40px)", maxHeight: 340, background: T.surface,
           border: `1px solid ${T.borderHi}`, borderRadius: 8,
           boxShadow: "0 12px 40px rgba(0,0,0,0.6)", zIndex: 100,
           display: "flex", flexDirection: "column", overflow: "hidden",
@@ -139,7 +139,7 @@ function IndicatorMenu({ active, onToggle }) {
       {open && (
         <div style={{
           position: "absolute", top: "100%", right: 0, marginTop: 4,
-          width: 260, background: T.surface,
+          width: 260, maxWidth: "calc(100vw - 40px)", background: T.surface,
           border: `1px solid ${T.borderHi}`, borderRadius: 8,
           boxShadow: "0 12px 40px rgba(0,0,0,0.6)", zIndex: 100,
           overflow: "hidden",
@@ -598,6 +598,7 @@ export default function Dashboard() {
           .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
           .chart-legend { flex-wrap: wrap !important; gap: 6px !important; }
           .chart-header { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
+          .stats-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 480px) {
           .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -1028,7 +1029,7 @@ export default function Dashboard() {
         )}
 
         {/* STATS GRID */}
-        <div style={{ display: "grid", gridTemplateColumns: [hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR, hasStochRsi, hasIchimoku].filter(Boolean).length > 1 ? `repeat(${[hasEco, hasObv, hasDemark, hasRsi, hasMacd, hasBollinger, hasAtr, hasAdx, hasCci, hasRoc, hasWilliamsR, hasStochRsi, hasIchimoku].filter(Boolean).length}, 1fr)` : "1fr", gap: 14 }}>
+        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
           {hasEco && (
             <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
