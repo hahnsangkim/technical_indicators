@@ -37,7 +37,9 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 - **AbortController** on every fetch to cancel stale requests on rapid ticker changes
 - **useMemo** for filtered data (3M/6M/1Y/ALL range slicing)
 - **Hooks before returns** — all `useMemo` calls placed before conditional early returns to satisfy React hooks ordering rules
+- **Independent price data** — `/api/price` fetched on every ticker change, decoupled from indicator selection. Price chart always works regardless of which indicators are active
 - **Generic indicator data map** — single `indicatorData` state + `filteredData` memo replaces per-indicator state (consolidated from 13 individual useState/fetch/memo blocks)
+- **Signal chart markers** — signal data merged into chart data via `mergeSignals()`, rendered as colored dots on primary Line/Area components using custom `dot` prop
 - **API_KEYS mapping** — handles endpoint name mismatches (e.g., `williamsR` → `williamsr`, `stochRsi` → `stochrsi`)
 - **Dynamic KPI cards** — grid adapts based on active indicators
 - **Price chart overlays** — DeMark risk line, Bollinger Bands, and Ichimoku Cloud merged into price chart data via date lookup
@@ -57,6 +59,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/tickers` | GET | Returns sorted list of all ticker symbols |
+| `/api/price?ticker=SPY` | GET | Raw OHLCV price data (independent of indicators) |
 | `/api/eco?ticker=SPY` | GET | ECO indicator (DEMA + volume-weighted) |
 | `/api/obv?ticker=SPY` | GET | OBV (On-Balance Volume) with EMA(20) signal |
 | `/api/demark?ticker=SPY` | GET | DeMark TD Sequential with risk line |

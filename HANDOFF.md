@@ -1,7 +1,7 @@
 # Session Handoff - Technical Indicators Dashboard
 
 > **Last Updated:** 2026-03-21
-> **Last Commit:** `faa2788` - test: add WatchlistPanel tests
+> **Last Commit:** `0ff8e4a` - chore: update package-lock.json
 > **Branch:** main
 
 ---
@@ -14,11 +14,11 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Backend Express API | ✅ Complete | 15 endpoints (14 indicators + signals + tickers + health) |
+| Backend Express API | ✅ Complete | 16 endpoints (14 indicators + price + signals + tickers + health) |
 | CSV data loading | ✅ Complete | 487 tickers, loaded once at startup |
 | Input validation | ✅ Complete | Regex validation, 400 on invalid ticker |
 | Error handling | ✅ Complete | Global handler, CSV load failure, CORS, frontend error banners |
-| Frontend Dashboard | ✅ Complete | Price chart + 14 indicator charts/overlays + KPI cards |
+| Frontend Dashboard | ✅ Complete | Independent price chart + 14 indicator charts/overlays + KPI cards |
 | Volume confluence | ✅ Complete | DeMark + OBV, 3 event types (CAPITULATION, OBV_DIVERGENCE, POST_SIGNAL) |
 | Loading skeletons | ✅ Complete | Shimmer skeleton placeholders during loading |
 | Error UI | ✅ Complete | Dismissible error banners for failed API requests |
@@ -68,7 +68,7 @@ No remaining tasks. All features implemented.
 ### Core Application
 - [app/ECOComparison.jsx](app/ECOComparison.jsx) - Main dashboard component with signal markers
 - [app/WatchlistPanel.jsx](app/WatchlistPanel.jsx) - Watchlist panel with grouped signals + notifications
-- [backend/server.js](backend/server.js) - Express API with 14 indicators + signals endpoint
+- [backend/server.js](backend/server.js) - Express API with price + 14 indicators + signals endpoint
 
 ### Tests
 - [backend/__tests__/math.test.js](backend/__tests__/math.test.js) - EMA/DEMA unit tests (9 tests)
@@ -87,6 +87,7 @@ No remaining tasks. All features implemented.
 
 ### Documentation
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture with all indicator formulas
+- [docs/SIGNAL_CONDITIONS.md](docs/SIGNAL_CONDITIONS.md) - Signal conditions reference (24 signal types)
 - [TEST_SPECIFICATION.md](TEST_SPECIFICATION.md) - 150+ test case specifications
 - [docs/plans/2026-03-21-missing-indicators.md](docs/plans/2026-03-21-missing-indicators.md) - Implementation plan for 10 new indicators
 - [technical0ndicators.md](technical0ndicators.md) - Indicator specification handbook
@@ -131,6 +132,7 @@ cd .. && npm test            # frontend: 28 tests
 - Backend exports all calc functions (`calcEco`, `calcRsi`, `calcMacd`, `calcBollinger`, `calcAtr`, `calcAdx`, `calcCci`, `calcRoc`, `calcWilliamsR`, `calcStochRsi`, `calcIchimoku`, `calcDemark`, `calcObv`) + `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA`, `parseRows` for testing
 - parseRows results are cached in a Map per ticker — safe because CSV is loaded once at startup and never changes
 - All 13 indicator calc functions are extracted and reusable; used by both individual endpoints and the signals/confluence endpoints
+- Price data fetched independently via `/api/price` — price chart decoupled from indicator selection (fixes confluence-only crash)
 - Confluence and signals data is sparse (events, not per-bar) — frontend filters by date instead of slicing by count
 - Signal detection scans last 10 bars for crossovers and threshold breaches (24 signal types across 13 indicators)
 - WatchlistPanel uses localStorage for persistence (watchlist, notification preference, seen signals)
