@@ -29,7 +29,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 |-----------|---------|
 | `Dashboard` | Main layout, state management, chart rendering |
 | `TickerSearch` | Searchable dropdown for 487 S&P 500 tickers |
-| `IndicatorMenu` | Multi-select indicator toggle (13 indicators) |
+| `IndicatorMenu` | Multi-select indicator toggle (14 indicators) |
 
 ### Key Patterns
 
@@ -69,6 +69,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | `/api/williamsr?ticker=SPY` | GET | Williams %R (period 14) |
 | `/api/stochrsi?ticker=SPY` | GET | Stochastic RSI (14, 14, 3, 3) |
 | `/api/ichimoku?ticker=SPY` | GET | Ichimoku Cloud (9, 26, 52) |
+| `/api/confluence?ticker=SPY` | GET | Volume Confluence (DeMark + OBV) |
 | `/api/health` | GET | Health check with row count |
 
 ### Input Validation
@@ -240,6 +241,31 @@ Chikou Span = Close, shifted 26 periods backward
 Output: tenkan, kijun, senkouA, senkouB, chikou
 ```
 
+### Volume Confluence (DeMark + OBV)
+
+Detects volume-price confluence events around DeMark signals. Returns a sparse array of events (not per-bar).
+
+```
+Three event types:
+
+CAPITULATION — DeMark signal fires on volume > 2x 20-bar SMA(volume)
+  Output: date, signal, type, volume, avgVolume, volumeRatio
+
+OBV_DIVERGENCE — Price and OBV trend in opposite directions across
+  the countdown span (from matching SETUP_9 to COUNTDOWN_13).
+  Only fires on COUNTDOWN_13 signals. Skips flat price/OBV.
+  Output: date, signal, type, priceDirection, obvDirection, countdownSpanBars
+
+POST_SIGNAL — 3 bars after any DeMark signal, checks follow-through.
+  CONFIRMED: buy signal + green candle with volume > avg, or
+             sell signal + red candle with volume > avg (any of 3 bars)
+  FAILED: no qualifying follow-through bar
+  Not emitted if <3 bars remain after signal.
+  Output: date, signal, type, barsAfter, validation, avgPostVolume, avgVolume
+```
+
+Reuses `calcDemark()` and `calcObv()` internally (shared functions also used by their respective endpoints).
+
 ## Deployment URLs
 
 | Service | URL |
@@ -260,7 +286,7 @@ Output: tenkan, kijun, senkouA, senkouB, chikou
 ### Backend Tests (vitest + supertest)
 
 ```bash
-cd backend && npm test       # 137 tests
+cd backend && npm test       # 149 tests
 cd backend && npm run test:watch  # watch mode
 ```
 
@@ -270,11 +296,13 @@ cd backend && npm run test:watch  # watch mode
 | `__tests__/validation.test.js` | 8 | Input sanitization, defaults, XSS rejection |
 | `__tests__/endpoints.test.js` | 104 | All 13 indicators + tickers + health: fields, bounds, formulas, sorting, warmup nulls, normalization |
 | `__tests__/errors.test.js` | 16 | CORS headers, concurrent requests, response time (<200ms per endpoint) |
+| `__tests__/confluence.test.js` | 11 | calcDemark/calcObv extraction, confluence endpoint (3 event types, validation, field checks) |
+| `__tests__/cache.test.js` | 1 | parseRows caching (referential identity) |
 
 ### Frontend Tests (vitest + jsdom + React Testing Library)
 
 ```bash
-npm test                     # 20 tests
+npm test                     # 23 tests
 npm run test:watch           # watch mode
 ```
 
@@ -283,11 +311,11 @@ npm run test:watch           # watch mode
 | `__tests__/fmtVol.test.js` | 5 | Volume formatting (B/M/K/raw, negatives) |
 | `__tests__/TickerSearch.test.jsx` | 5 | Dropdown open, search filter, max results, selection, ticker count |
 | `__tests__/IndicatorMenu.test.jsx` | 4 | Badge count, toggle callback, 13 indicators listed, unique colors |
-| `__tests__/Dashboard.test.jsx` | 6 | Loading state, empty data, chart render, KPI cards, range buttons, signal badge |
+| `__tests__/Dashboard.test.jsx` | 9 | Loading skeleton, empty data, chart render, KPI cards, range buttons, signal badge, error UI, confluence |
 
 ### Test Architecture
 
-- **Backend** exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA` for testing (server only listens when run directly)
+- **Backend** exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA`, `parseRows`, `calcDemark`, `calcObv` for testing (server only listens when run directly)
 - **Frontend** exports `TickerSearch`, `IndicatorMenu`, `fmtVol`, `INDICATORS`, `T` as named exports
 - Recharts is mocked in Dashboard tests to avoid canvas/SVG issues in jsdom
 
