@@ -124,21 +124,13 @@ app.get("/api/eco", (req, res) => {
   res.json({ ticker, data });
 });
 
-// ─── GET /api/obv?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/obv", (req, res) => {
-  const ticker = validateTicker(req.query.ticker);
-  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
-  const rows = parseRows(ticker);
-
-  if (rows.length === 0) {
-    return res.json({ ticker, data: [] });
-  }
-
+// ─── calcObv — reusable OBV calculation ──────────────────────────────────────
+function calcObv(rows) {
   let obv = 0;
   const k20 = emaK(20);
   let obvEma = 0;
 
-  const data = rows.map((row, i) => {
+  return rows.map((row, i) => {
     if (i === 0) {
       obv = 0;
     } else {
@@ -158,8 +150,15 @@ app.get("/api/obv", (req, res) => {
       obvEma: Math.round(obvEma),
     };
   });
+}
 
-  res.json({ ticker, data });
+// ─── GET /api/obv?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/obv", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcObv(rows) });
 });
 
 // ─── TD Risk Line ────────────────────────────────────────────────────────────
@@ -741,4 +740,4 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
-export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows, calcDemark };
+export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows, calcDemark, calcObv };

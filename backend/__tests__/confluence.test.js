@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcDemark } from "../server.js";
+import { calcDemark, calcObv } from "../server.js";
 
 describe("calcDemark (extracted function)", () => {
   it("is exported and callable", () => {
@@ -18,5 +18,23 @@ describe("calcDemark (extracted function)", () => {
     expect(result.length).toBe(rows.length);
     expect(result[0]).toHaveProperty("signal");
     expect(result[0]).toHaveProperty("setupCount");
+  });
+});
+
+describe("calcObv (extracted function)", () => {
+  it("is exported and callable", () => {
+    expect(typeof calcObv).toBe("function");
+  });
+
+  it("returns array with obv and obvEma fields", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+      open: 100 + i, high: 101 + i, low: 99 + i,
+      close: 100 + i, volume: 1000000,
+    }));
+    const result = calcObv(rows);
+    expect(result.length).toBe(10);
+    expect(result[0]).toHaveProperty("obv");
+    expect(result[0]).toHaveProperty("obvEma");
   });
 });
