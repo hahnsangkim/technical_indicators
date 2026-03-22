@@ -313,7 +313,8 @@ export default function Dashboard() {
   };
 
   // Use whichever dataset is available for price chart / range filtering
-  const primaryData = Object.values(indicatorData).find(d => d && d.length > 0) || null;
+  // Exclude confluence (sparse events, not per-bar price data)
+  const primaryData = Object.entries(indicatorData).find(([k, d]) => k !== "confluence" && d && d.length > 0)?.[1] || null;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
