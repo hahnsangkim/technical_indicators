@@ -714,6 +714,8 @@ export default function Dashboard() {
           .chart-legend { flex-wrap: wrap !important; gap: 6px !important; }
           .chart-header { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
           .stats-grid { grid-template-columns: 1fr !important; }
+          .chart-stats-row { flex-direction: column !important; }
+          .chart-stats-row .stats-sidebar { width: 100% !important; }
         }
         @media (max-width: 480px) {
           .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -843,104 +845,162 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* ECO CHART */}
+        {/* ECO CHART + STATS */}
         {hasEco && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ECO — DEMA + VOLUME-WEIGHTED</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ECO</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ECO — DEMA + VOLUME-WEIGHTED</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.cyan, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ECO</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+                </div>
               </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.eco, "eco")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.eco.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                  <Bar dataKey="histogram" name="Histogram" fill={T.muted}
+                    shape={({ x, y, width, height, payload }) => {
+                      const c = payload.histogram >= 0 ? T.lime : T.red;
+                      return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
+                    }} />
+                  <Line type="monotone" dataKey="eco" stroke={T.cyan} strokeWidth={2} dot={signalDot} name="ECO" />
+                  <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.eco, "eco")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.eco.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
-                <Bar dataKey="histogram" name="Histogram" fill={T.muted}
-                  shape={({ x, y, width, height, payload }) => {
-                    const c = payload.histogram >= 0 ? T.lime : T.red;
-                    return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
-                  }} />
-                <Line type="monotone" dataKey="eco" stroke={T.cyan} strokeWidth={2} dot={signalDot} name="ECO" />
-                <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
+              {[
+                ["Method", "DEMA + Vol-Weighted", T.cyan],
+                ["Current ECO", ecoLatest.eco.toFixed(2), T.cyan],
+                ["Current Signal", ecoLatest.signal.toFixed(2), T.gold],
+                ["ECO High", ecoMax.toFixed(2), T.lime],
+                ["ECO Low", ecoMin.toFixed(2), T.red],
+                ["Bullish Bars", `${ecoBullBars} / ${filteredData.eco.length} (${ecoBullPct}%)`, T.lime],
+                ["Crossovers", `${ecoCrossovers}`, T.purple],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* OBV CHART */}
+        {/* OBV CHART + STATS */}
         {hasObv && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ON-BALANCE VOLUME (OBV)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>EMA(20)</span></span>
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ON-BALANCE VOLUME (OBV)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>OBV</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>EMA(20)</span></span>
+                </div>
               </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.obv, "obv")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="obvGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={T.purple} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={T.purple} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.obv.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
+                    tickFormatter={v => fmtVol(v)} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }}
+                    formatter={(v) => [fmtVol(v), ""]} />
+                  <Area type="monotone" dataKey="obv" stroke={T.purple} fill="url(#obvGrad)" strokeWidth={2} dot={signalDot} name="OBV" />
+                  <Line type="monotone" dataKey="obvEma" stroke={T.gold} strokeWidth={1.5} dot={false} name="EMA(20)" strokeDasharray="4 2" />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.obv, "obv")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="obvGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={T.purple} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={T.purple} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.obv.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]}
-                  tickFormatter={v => fmtVol(v)} width={50} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }}
-                  formatter={(v) => [fmtVol(v), ""]} />
-                <Area type="monotone" dataKey="obv" stroke={T.purple} fill="url(#obvGrad)" strokeWidth={2} dot={signalDot} name="OBV" />
-                <Line type="monotone" dataKey="obvEma" stroke={T.gold} strokeWidth={1.5} dot={false} name="EMA(20)" strokeDasharray="4 2" />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>OBV STATISTICS</div>
+              {[
+                ["Method", "Cumulative Volume", T.purple],
+                ["Current OBV", fmtVol(obvLatest.obv), T.purple],
+                ["OBV EMA(20)", fmtVol(obvLatest.obvEma), T.gold],
+                ["OBV High", fmtVol(obvMax), T.lime],
+                ["OBV Low", fmtVol(obvMin), T.red],
+                ["Trend", obvTrend, obvTrend === "BULLISH" ? T.lime : T.red],
+                ["OBV vs EMA", fmtVol(obvLatest.obv - obvLatest.obvEma), obvLatest.obv > obvLatest.obvEma ? T.lime : T.red],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* DEMARK CHART */}
+        {/* DEMARK CHART + STATS */}
         {hasDemark && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>TD SEQUENTIAL — SETUP &amp; COUNTDOWN</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Buy Setup</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Sell Setup</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Countdown</span></span>
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>TD SEQUENTIAL — SETUP &amp; COUNTDOWN</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Buy Setup</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Sell Setup</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Countdown</span></span>
+                </div>
               </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={filteredData.demark} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.demark.length / 6)} />
+                  <YAxis yAxisId="setup" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
+                    domain={[-10, 10]} width={30} tickFormatter={v => Math.abs(v)} />
+                  <YAxis yAxisId="countdown" orientation="right" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
+                    domain={[0, 14]} width={30} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }}
+                    formatter={(v, name) => {
+                      if (name === "Setup") return [Math.abs(v), v < 0 ? "Buy Setup" : v > 0 ? "Sell Setup" : "—"];
+                      return [v, name];
+                    }} />
+                  <ReferenceLine yAxisId="setup" y={0} stroke={T.border} strokeDasharray="3 3" />
+                  <Bar yAxisId="setup" dataKey="setupCount" name="Setup"
+                    shape={({ x, y, width, height, payload }) => {
+                      const c = payload.setupCount < 0 ? T.lime : payload.setupCount > 0 ? T.red : "transparent";
+                      const opacity = payload.setupComplete ? 1 : 0.5;
+                      return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={opacity} rx={1} />;
+                    }} />
+                  <Line yAxisId="countdown" type="stepAfter" dataKey="countdownCount" stroke={T.gold} strokeWidth={2} dot={false} name="Countdown" />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.demark} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.demark.length / 6)} />
-                <YAxis yAxisId="setup" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
-                  domain={[-10, 10]} width={30} tickFormatter={v => Math.abs(v)} />
-                <YAxis yAxisId="countdown" orientation="right" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false}
-                  domain={[0, 14]} width={30} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }}
-                  formatter={(v, name) => {
-                    if (name === "Setup") return [Math.abs(v), v < 0 ? "Buy Setup" : v > 0 ? "Sell Setup" : "—"];
-                    return [v, name];
-                  }} />
-                <ReferenceLine yAxisId="setup" y={0} stroke={T.border} strokeDasharray="3 3" />
-                <Bar yAxisId="setup" dataKey="setupCount" name="Setup"
-                  shape={({ x, y, width, height, payload }) => {
-                    const c = payload.setupCount < 0 ? T.lime : payload.setupCount > 0 ? T.red : "transparent";
-                    const opacity = payload.setupComplete ? 1 : 0.5;
-                    return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={opacity} rx={1} />;
-                  }} />
-                <Line yAxisId="countdown" type="stepAfter" dataKey="countdownCount" stroke={T.gold} strokeWidth={2} dot={false} name="Countdown" />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>DEMARK STATISTICS</div>
+              {[
+                ["Method", "TD Sequential", T.gold],
+                ["Setup Phase", demarkLatest.setupType ? `${demarkLatest.setupType} (${Math.abs(demarkLatest.setupCount)}/9)` : "Inactive", demarkLatest.setupType === "buy" ? T.lime : demarkLatest.setupType === "sell" ? T.red : T.muted],
+                ["Countdown", demarkLatest.countdownType ? `${demarkLatest.countdownType} (${demarkLatest.countdownCount}/13)` : "Inactive", T.gold],
+                ["Setup 9 Signals", `${demarkSetup9Count}`, T.cyan],
+                ["Countdown 13s", `${demarkCountdown13Count}`, T.purple],
+                ["Total Signals", `${demarkSignals.length}`, T.blue],
+                ["Last Signal", lastDemarkSignal ? `${lastDemarkSignal.signal.replace(/_/g, " ")}` : "None", lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted],
+                ["Risk Line", currentRiskLine ? `$${currentRiskLine} (${currentRiskLineType})` : "Inactive", currentRiskLine ? T.red : T.muted],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -974,287 +1034,33 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* RSI CHART */}
+        {/* RSI CHART + STATS */}
         {hasRsi && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.rsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>RSI</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (70)</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (30)</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.rsi, "rsi")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.rsi.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, 100]} width={30} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={70} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <ReferenceLine y={50} stroke={T.border} strokeDasharray="3 3" />
-                <ReferenceLine y={30} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="rsi" stroke={INDICATORS.rsi.color} fill={`${INDICATORS.rsi.color}15`} strokeWidth={2} dot={signalDot} name="RSI" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* MACD CHART */}
-        {hasMacd && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>MACD — EMA(12, 26, 9)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.macd.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>MACD</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.macd, "macd")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.macd.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
-                <Bar dataKey="histogram" name="Histogram" fill={T.muted}
-                  shape={({ x, y, width, height, payload }) => {
-                    const c = payload.histogram >= 0 ? T.lime : T.red;
-                    return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
-                  }} />
-                <Line type="monotone" dataKey="macd" stroke={INDICATORS.macd.color} strokeWidth={2} dot={signalDot} name="MACD" />
-                <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* ATR CHART */}
-        {hasAtr && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ATR — AVERAGE TRUE RANGE (14)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.atr.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ATR</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={180}>
-              <ComposedChart data={mergeSignals(filteredData.atr, "atr")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.atr.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <Area type="monotone" dataKey="atr" stroke={INDICATORS.atr.color} fill={`${INDICATORS.atr.color}15`} strokeWidth={2} dot={signalDot} name="ATR" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* ADX CHART */}
-        {hasAdx && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ADX — AVERAGE DIRECTIONAL INDEX (14)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.adx.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ADX</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>+DI</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>-DI</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.adx, "adx")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.adx.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, "auto"]} width={30} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={25} stroke={T.border} strokeDasharray="3 3" />
-                <Line type="monotone" dataKey="adx" stroke={INDICATORS.adx.color} strokeWidth={2} dot={signalDot} name="ADX" />
-                <Line type="monotone" dataKey="plusDI" stroke={T.lime} strokeWidth={1.5} dot={false} name="+DI" />
-                <Line type="monotone" dataKey="minusDI" stroke={T.red} strokeWidth={1.5} dot={false} name="-DI" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* CCI CHART */}
-        {hasCci && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>CCI — COMMODITY CHANNEL INDEX (20)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.cci.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>CCI</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (+100)</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-100)</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.cci, "cci")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="cciGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={INDICATORS.cci.color} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={INDICATORS.cci.color} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.cci.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={100} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
-                <ReferenceLine y={-100} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="cci" stroke={INDICATORS.cci.color} fill="url(#cciGrad)" strokeWidth={2} dot={signalDot} name="CCI" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* ROC CHART */}
-        {hasRoc && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ROC — RATE OF CHANGE (12)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.roc.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ROC</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.border, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Zero Line</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.roc, "roc")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.roc.length / 6)} />
-                <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
-                <Area type="monotone" dataKey="roc" stroke={INDICATORS.roc.color} fill={`${INDICATORS.roc.color}15`} strokeWidth={2} dot={signalDot} name="ROC" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* WILLIAMS %R CHART */}
-        {hasWilliamsR && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>WILLIAMS %R (14)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.williamsR.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%R</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (-20)</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-80)</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.williamsR, "williamsR")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.williamsR.length / 6)} />
-                <YAxis domain={[-100, 0]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={-20} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <ReferenceLine y={-80} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="williamsR" stroke={INDICATORS.williamsR.color} fill={`${INDICATORS.williamsR.color}15`} strokeWidth={2} dot={signalDot} name="Williams %R" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* STOCHASTIC RSI CHART */}
-        {hasStochRsi && (
-          <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10, marginBottom: 14 }}>
-            <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>STOCHASTIC RSI (14,14,3,3)</div>
-              <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.stochRsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%K</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%D</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (0.8)</span></span>
-                <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (0.2)</span></span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={mergeSignals(filteredData.stochRsi, "stochRsi")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
-                  tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.stochRsi.length / 6)} />
-                <YAxis domain={[0, 1]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
-                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
-                  labelStyle={{ color: T.sub }} />
-                <ReferenceLine y={0.8} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <ReferenceLine y={0.5} stroke={T.border} strokeDasharray="3 3" />
-                <ReferenceLine y={0.2} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Line type="monotone" dataKey="k" stroke={INDICATORS.stochRsi.color} strokeWidth={2} dot={signalDot} name="%K" />
-                <Line type="monotone" dataKey="d" stroke={T.purple} strokeWidth={1.5} dot={false} name="%D" strokeDasharray="4 2" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* STATS GRID */}
-        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-          {hasEco && (
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ECO STATISTICS</div>
-              {[
-                ["Method", "DEMA + Vol-Weighted", T.cyan],
-                ["Current ECO", ecoLatest.eco.toFixed(2), T.cyan],
-                ["Current Signal", ecoLatest.signal.toFixed(2), T.gold],
-                ["ECO High", ecoMax.toFixed(2), T.lime],
-                ["ECO Low", ecoMin.toFixed(2), T.red],
-                ["Bullish Bars", `${ecoBullBars} / ${filteredData.eco.length} (${ecoBullPct}%)`, T.lime],
-                ["Crossovers", `${ecoCrossovers}`, T.purple],
-              ].map(([label, value, color]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>RSI — RELATIVE STRENGTH INDEX (14)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.rsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>RSI</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (70)</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (30)</span></span>
                 </div>
-              ))}
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.rsi, "rsi")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.rsi.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, 100]} width={30} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={70} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <ReferenceLine y={50} stroke={T.border} strokeDasharray="3 3" />
+                  <ReferenceLine y={30} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <Area type="monotone" dataKey="rsi" stroke={INDICATORS.rsi.color} fill={`${INDICATORS.rsi.color}15`} strokeWidth={2} dot={signalDot} name="RSI" />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
-          )}
-          {hasObv && (
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>OBV STATISTICS</div>
-              {[
-                ["Method", "Cumulative Volume", T.purple],
-                ["Current OBV", fmtVol(obvLatest.obv), T.purple],
-                ["OBV EMA(20)", fmtVol(obvLatest.obvEma), T.gold],
-                ["OBV High", fmtVol(obvMax), T.lime],
-                ["OBV Low", fmtVol(obvMin), T.red],
-                ["Trend", obvTrend, obvTrend === "BULLISH" ? T.lime : T.red],
-                ["OBV vs EMA", fmtVol(obvLatest.obv - obvLatest.obvEma), obvLatest.obv > obvLatest.obvEma ? T.lime : T.red],
-              ].map(([label, value, color]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {hasDemark && (
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>DEMARK STATISTICS</div>
-              {[
-                ["Method", "TD Sequential", T.gold],
-                ["Setup Phase", demarkLatest.setupType ? `${demarkLatest.setupType} (${Math.abs(demarkLatest.setupCount)}/9)` : "Inactive", demarkLatest.setupType === "buy" ? T.lime : demarkLatest.setupType === "sell" ? T.red : T.muted],
-                ["Countdown", demarkLatest.countdownType ? `${demarkLatest.countdownType} (${demarkLatest.countdownCount}/13)` : "Inactive", T.gold],
-                ["Setup 9 Signals", `${demarkSetup9Count}`, T.cyan],
-                ["Countdown 13s", `${demarkCountdown13Count}`, T.purple],
-                ["Total Signals", `${demarkSignals.length}`, T.blue],
-                ["Last Signal", lastDemarkSignal ? `${lastDemarkSignal.signal.replace(/_/g, " ")}` : "None", lastDemarkSignal?.signal.startsWith("BUY") ? T.lime : lastDemarkSignal?.signal.startsWith("SELL") ? T.red : T.muted],
-                ["Risk Line", currentRiskLine ? `$${currentRiskLine} (${currentRiskLineType})` : "Inactive", currentRiskLine ? T.red : T.muted],
-              ].map(([label, value, color]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {hasRsi && (
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+            <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>RSI STATISTICS</div>
               {[
                 ["Method", "Wilder's RSI", INDICATORS.rsi.color],
@@ -1272,9 +1078,40 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          )}
-          {hasMacd && (
-            <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+          </div>
+        )}
+
+        {/* MACD CHART + STATS */}
+        {hasMacd && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>MACD — EMA(12, 26, 9)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.macd.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>MACD</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.gold, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Signal</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.muted, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Histogram</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.macd, "macd")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.macd.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                  <Bar dataKey="histogram" name="Histogram" fill={T.muted}
+                    shape={({ x, y, width, height, payload }) => {
+                      const c = payload.histogram >= 0 ? T.lime : T.red;
+                      return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
+                    }} />
+                  <Line type="monotone" dataKey="macd" stroke={INDICATORS.macd.color} strokeWidth={2} dot={signalDot} name="MACD" />
+                  <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
               <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>MACD STATISTICS</div>
               {[
                 ["Method", "EMA(12, 26, 9)", INDICATORS.macd.color],
@@ -1290,7 +1127,325 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* ATR CHART + STATS */}
+        {hasAtr && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ATR — AVERAGE TRUE RANGE (14)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.atr.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ATR</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <ComposedChart data={mergeSignals(filteredData.atr, "atr")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.atr.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <Area type="monotone" dataKey="atr" stroke={INDICATORS.atr.color} fill={`${INDICATORS.atr.color}15`} strokeWidth={2} dot={signalDot} name="ATR" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {atrLatest.atr !== null && (() => {
+              const atrPct = (atrLatest.atr / atrLatest.close * 100);
+              const volatilityLevel = atrPct > 3 ? "High" : atrPct > 1.5 ? "Moderate" : "Low";
+              const volatilityColor = atrPct > 3 ? T.red : atrPct > 1.5 ? T.gold : T.lime;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ATR STATISTICS</div>
+                  {[
+                    ["Method", "Wilder's ATR (14)", INDICATORS.atr.color],
+                    ["Current ATR", atrLatest.atr.toFixed(4), INDICATORS.atr.color],
+                    ["ATR %", atrPct.toFixed(2) + "%", INDICATORS.atr.color],
+                    ["ATR High", atrMax.toFixed(4), T.lime],
+                    ["ATR Low", atrMin.toFixed(4), T.red],
+                    ["Current TR", atrLatest.tr.toFixed(4), T.cyan],
+                    ["Volatility", volatilityLevel, volatilityColor],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ADX CHART + STATS */}
+        {hasAdx && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ADX — AVERAGE DIRECTIONAL INDEX (14)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.adx.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ADX</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>+DI</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>-DI</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.adx, "adx")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.adx.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, "auto"]} width={30} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={25} stroke={T.border} strokeDasharray="3 3" />
+                  <Line type="monotone" dataKey="adx" stroke={INDICATORS.adx.color} strokeWidth={2} dot={signalDot} name="ADX" />
+                  <Line type="monotone" dataKey="plusDI" stroke={T.lime} strokeWidth={1.5} dot={false} name="+DI" />
+                  <Line type="monotone" dataKey="minusDI" stroke={T.red} strokeWidth={1.5} dot={false} name="-DI" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {adxLatest.adx !== null && (() => {
+              const trendStrength = adxLatest.adx > 50 ? "Very Strong" : adxLatest.adx > 25 ? "Strong" : "Weak";
+              const trendStrengthColor = adxLatest.adx > 50 ? T.lime : adxLatest.adx > 25 ? T.cyan : T.sub;
+              const directionalBias = adxLatest.plusDI > adxLatest.minusDI ? "Bullish" : "Bearish";
+              const directionalColor = adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ADX STATISTICS</div>
+                  {[
+                    ["Method", "Wilder's ADX (14)", INDICATORS.adx.color],
+                    ["ADX Value", adxLatest.adx.toFixed(2), INDICATORS.adx.color],
+                    ["Trend Strength", trendStrength, trendStrengthColor],
+                    ["+DI", adxLatest.plusDI.toFixed(2), T.lime],
+                    ["-DI", adxLatest.minusDI.toFixed(2), T.red],
+                    ["Directional Bias", directionalBias, directionalColor],
+                    ["ADX High", adxMax.toFixed(2), T.cyan],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* CCI CHART + STATS */}
+        {hasCci && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>CCI — COMMODITY CHANNEL INDEX (20)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.cci.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>CCI</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (+100)</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-100)</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.cci, "cci")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="cciGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={INDICATORS.cci.color} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={INDICATORS.cci.color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.cci.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={100} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                  <ReferenceLine y={-100} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <Area type="monotone" dataKey="cci" stroke={INDICATORS.cci.color} fill="url(#cciGrad)" strokeWidth={2} dot={signalDot} name="CCI" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {cciLatest.cci !== null && (() => {
+              const cciStatus = cciLatest.cci > 100 ? "Overbought" : cciLatest.cci < -100 ? "Oversold" : "Neutral";
+              const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>CCI STATISTICS</div>
+                  {[
+                    ["Method", "Typical Price CCI (20)", INDICATORS.cci.color],
+                    ["Current CCI", cciLatest.cci.toFixed(2), INDICATORS.cci.color],
+                    ["Status", cciStatus, cciStatusColor],
+                    ["CCI High", cciMax.toFixed(2), T.lime],
+                    ["CCI Low", cciMin.toFixed(2), T.red],
+                    ["Overbought Bars", `${cciOverboughtBars} / ${filteredData.cci.length}`, T.red],
+                    ["Oversold Bars", `${cciOversoldBars} / ${filteredData.cci.length}`, T.lime],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ROC CHART + STATS */}
+        {hasRoc && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>ROC — RATE OF CHANGE (12)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.roc.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>ROC</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.border, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Zero Line</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.roc, "roc")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.roc.length / 6)} />
+                  <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
+                  <Area type="monotone" dataKey="roc" stroke={INDICATORS.roc.color} fill={`${INDICATORS.roc.color}15`} strokeWidth={2} dot={signalDot} name="ROC" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {rocLatest.roc !== null && (() => {
+              const rocDirection = rocLatest.roc > 0 ? "Positive" : "Negative";
+              const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ROC STATISTICS</div>
+                  {[
+                    ["Method", "Rate of Change (12)", INDICATORS.roc.color],
+                    ["Current ROC", rocLatest.roc.toFixed(4), INDICATORS.roc.color],
+                    ["Direction", rocDirection, rocDirColor],
+                    ["ROC High", rocMax.toFixed(4), T.lime],
+                    ["ROC Low", rocMin.toFixed(4), T.red],
+                    ["Positive Bars", `${rocPositiveBars} / ${filteredData.roc.length}`, T.lime],
+                    ["Negative Bars", `${rocNegativeBars} / ${filteredData.roc.length}`, T.red],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* WILLIAMS %R CHART + STATS */}
+        {hasWilliamsR && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>WILLIAMS %R (14)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.williamsR.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%R</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (-20)</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (-80)</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.williamsR, "williamsR")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.williamsR.length / 6)} />
+                  <YAxis domain={[-100, 0]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={-20} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <ReferenceLine y={-80} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <Area type="monotone" dataKey="williamsR" stroke={INDICATORS.williamsR.color} fill={`${INDICATORS.williamsR.color}15`} strokeWidth={2} dot={signalDot} name="Williams %R" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {williamsRLatest.williamsR !== null && (() => {
+              const wrStatus = williamsRLatest.williamsR > -20 ? "Overbought" : williamsRLatest.williamsR < -80 ? "Oversold" : "Neutral";
+              const wrStatusColor = williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>WILLIAMS %R STATISTICS</div>
+                  {[
+                    ["Method", "Williams %R (14)", INDICATORS.williamsR.color],
+                    ["Current %R", williamsRLatest.williamsR.toFixed(2), INDICATORS.williamsR.color],
+                    ["Status", wrStatus, wrStatusColor],
+                    ["%R High", wrMax.toFixed(2), T.lime],
+                    ["%R Low", wrMin.toFixed(2), T.red],
+                    ["Overbought Bars", `${wrOverboughtBars} / ${filteredData.williamsR.length}`, T.red],
+                    ["Oversold Bars", `${wrOversoldBars} / ${filteredData.williamsR.length}`, T.lime],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* STOCHASTIC RSI CHART + STATS */}
+        {hasStochRsi && (
+          <div className="chart-stats-row" style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+              <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>STOCHASTIC RSI (14,14,3,3)</div>
+                <div className="chart-legend" style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: INDICATORS.stochRsi.color, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%K</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 3, background: T.purple, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>%D</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.red, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Overbought (0.8)</span></span>
+                  <span style={{ fontSize: 10 }}><span style={{ display: "inline-block", width: 10, height: 2, background: T.lime, borderRadius: 2, marginRight: 4, verticalAlign: "middle" }}></span><span style={{ color: T.sub }}>Oversold (0.2)</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={mergeSignals(filteredData.stochRsi, "stochRsi")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
+                    tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.stochRsi.length / 6)} />
+                  <YAxis domain={[0, 1]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
+                  <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
+                    labelStyle={{ color: T.sub }} />
+                  <ReferenceLine y={0.8} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <ReferenceLine y={0.5} stroke={T.border} strokeDasharray="3 3" />
+                  <ReferenceLine y={0.2} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <Line type="monotone" dataKey="k" stroke={INDICATORS.stochRsi.color} strokeWidth={2} dot={signalDot} name="%K" />
+                  <Line type="monotone" dataKey="d" stroke={T.purple} strokeWidth={1.5} dot={false} name="%D" strokeDasharray="4 2" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {stochRsiLatest.k !== null && (() => {
+              const srZone = stochRsiLatest.k > 0.8 ? "Overbought" : stochRsiLatest.k < 0.2 ? "Oversold" : "Neutral";
+              const srZoneColor = stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub;
+              return (
+                <div className="stats-sidebar" style={{ width: 260, flexShrink: 0, padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>STOCHRSI STATISTICS</div>
+                  {[
+                    ["Method", "StochRSI (14,14,3,3)", INDICATORS.stochRsi.color],
+                    ["Raw StochRSI", stochRsiLatest.stochRsi.toFixed(4), INDICATORS.stochRsi.color],
+                    ["%K", stochRsiLatest.k.toFixed(4), INDICATORS.stochRsi.color],
+                    ["%D", stochRsiLatest.d.toFixed(4), T.purple],
+                    ["Zone", srZone, srZoneColor],
+                    ["Overbought Bars", `${srOverboughtBars} / ${filteredData.stochRsi.length}`, T.red],
+                    ["Oversold Bars", `${srOversoldBars} / ${filteredData.stochRsi.length}`, T.lime],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
+                      <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* OVERLAY-ONLY STATS (Bollinger & Ichimoku - no separate charts) */}
+        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
           {hasBollinger && bollingerLatest.upper !== null && (() => {
             const bandwidth = ((bollingerLatest.upper - bollingerLatest.lower) / bollingerLatest.middle * 100);
             const percentB = ((bollingerLatest.close - bollingerLatest.lower) / (bollingerLatest.upper - bollingerLatest.lower) * 100);
@@ -1307,147 +1462,6 @@ export default function Dashboard() {
                   ["Bandwidth", bandwidth.toFixed(1) + "%", T.cyan],
                   ["%B", percentB.toFixed(1) + "%", percentB > 100 ? T.red : percentB < 0 ? T.lime : T.sub],
                   ["Price Position", pricePos, pricePosColor],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {hasAtr && atrLatest.atr !== null && (() => {
-            const atrPct = (atrLatest.atr / atrLatest.close * 100);
-            const volatilityLevel = atrPct > 3 ? "High" : atrPct > 1.5 ? "Moderate" : "Low";
-            const volatilityColor = atrPct > 3 ? T.red : atrPct > 1.5 ? T.gold : T.lime;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ATR STATISTICS</div>
-                {[
-                  ["Method", "Wilder's ATR (14)", INDICATORS.atr.color],
-                  ["Current ATR", atrLatest.atr.toFixed(4), INDICATORS.atr.color],
-                  ["ATR %", atrPct.toFixed(2) + "%", INDICATORS.atr.color],
-                  ["ATR High", atrMax.toFixed(4), T.lime],
-                  ["ATR Low", atrMin.toFixed(4), T.red],
-                  ["Current TR", atrLatest.tr.toFixed(4), T.cyan],
-                  ["Volatility", volatilityLevel, volatilityColor],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {hasAdx && adxLatest.adx !== null && (() => {
-            const trendStrength = adxLatest.adx > 50 ? "Very Strong" : adxLatest.adx > 25 ? "Strong" : "Weak";
-            const trendStrengthColor = adxLatest.adx > 50 ? T.lime : adxLatest.adx > 25 ? T.cyan : T.sub;
-            const directionalBias = adxLatest.plusDI > adxLatest.minusDI ? "Bullish" : "Bearish";
-            const directionalColor = adxLatest.plusDI > adxLatest.minusDI ? T.lime : T.red;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ADX STATISTICS</div>
-                {[
-                  ["Method", "Wilder's ADX (14)", INDICATORS.adx.color],
-                  ["ADX Value", adxLatest.adx.toFixed(2), INDICATORS.adx.color],
-                  ["Trend Strength", trendStrength, trendStrengthColor],
-                  ["+DI", adxLatest.plusDI.toFixed(2), T.lime],
-                  ["-DI", adxLatest.minusDI.toFixed(2), T.red],
-                  ["Directional Bias", directionalBias, directionalColor],
-                  ["ADX High", adxMax.toFixed(2), T.cyan],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {hasCci && cciLatest.cci !== null && (() => {
-            const cciStatus = cciLatest.cci > 100 ? "Overbought" : cciLatest.cci < -100 ? "Oversold" : "Neutral";
-            const cciStatusColor = cciLatest.cci > 100 ? T.red : cciLatest.cci < -100 ? T.lime : T.sub;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>CCI STATISTICS</div>
-                {[
-                  ["Method", "Typical Price CCI (20)", INDICATORS.cci.color],
-                  ["Current CCI", cciLatest.cci.toFixed(2), INDICATORS.cci.color],
-                  ["Status", cciStatus, cciStatusColor],
-                  ["CCI High", cciMax.toFixed(2), T.lime],
-                  ["CCI Low", cciMin.toFixed(2), T.red],
-                  ["Overbought Bars", `${cciOverboughtBars} / ${filteredData.cci.length}`, T.red],
-                  ["Oversold Bars", `${cciOversoldBars} / ${filteredData.cci.length}`, T.lime],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {hasRoc && rocLatest.roc !== null && (() => {
-            const rocDirection = rocLatest.roc > 0 ? "Positive" : "Negative";
-            const rocDirColor = rocLatest.roc > 0 ? T.lime : T.red;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>ROC STATISTICS</div>
-                {[
-                  ["Method", "Rate of Change (12)", INDICATORS.roc.color],
-                  ["Current ROC", rocLatest.roc.toFixed(4), INDICATORS.roc.color],
-                  ["Direction", rocDirection, rocDirColor],
-                  ["ROC High", rocMax.toFixed(4), T.lime],
-                  ["ROC Low", rocMin.toFixed(4), T.red],
-                  ["Positive Bars", `${rocPositiveBars} / ${filteredData.roc.length}`, T.lime],
-                  ["Negative Bars", `${rocNegativeBars} / ${filteredData.roc.length}`, T.red],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {hasWilliamsR && williamsRLatest.williamsR !== null && (() => {
-            const wrStatus = williamsRLatest.williamsR > -20 ? "Overbought" : williamsRLatest.williamsR < -80 ? "Oversold" : "Neutral";
-            const wrStatusColor = williamsRLatest.williamsR > -20 ? T.red : williamsRLatest.williamsR < -80 ? T.lime : T.sub;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>WILLIAMS %R STATISTICS</div>
-                {[
-                  ["Method", "Williams %R (14)", INDICATORS.williamsR.color],
-                  ["Current %R", williamsRLatest.williamsR.toFixed(2), INDICATORS.williamsR.color],
-                  ["Status", wrStatus, wrStatusColor],
-                  ["%R High", wrMax.toFixed(2), T.lime],
-                  ["%R Low", wrMin.toFixed(2), T.red],
-                  ["Overbought Bars", `${wrOverboughtBars} / ${filteredData.williamsR.length}`, T.red],
-                  ["Oversold Bars", `${wrOversoldBars} / ${filteredData.williamsR.length}`, T.lime],
-                ].map(([label, value, color]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
-                    <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {hasStochRsi && stochRsiLatest.k !== null && (() => {
-            const srZone = stochRsiLatest.k > 0.8 ? "Overbought" : stochRsiLatest.k < 0.2 ? "Oversold" : "Neutral";
-            const srZoneColor = stochRsiLatest.k > 0.8 ? T.red : stochRsiLatest.k < 0.2 ? T.lime : T.sub;
-            return (
-              <div style={{ padding: "14px", background: T.panel, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 12 }}>STOCHRSI STATISTICS</div>
-                {[
-                  ["Method", "StochRSI (14,14,3,3)", INDICATORS.stochRsi.color],
-                  ["Raw StochRSI", stochRsiLatest.stochRsi.toFixed(4), INDICATORS.stochRsi.color],
-                  ["%K", stochRsiLatest.k.toFixed(4), INDICATORS.stochRsi.color],
-                  ["%D", stochRsiLatest.d.toFixed(4), T.purple],
-                  ["Zone", srZone, srZoneColor],
-                  ["Overbought Bars", `${srOverboughtBars} / ${filteredData.stochRsi.length}`, T.red],
-                  ["Oversold Bars", `${srOversoldBars} / ${filteredData.stochRsi.length}`, T.lime],
                 ].map(([label, value, color]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
                     <span style={{ fontSize: 11, color: T.sub }}>{label}</span>
