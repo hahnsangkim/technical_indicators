@@ -68,16 +68,8 @@ function validateTicker(raw) {
   return ticker;
 }
 
-// ─── GET /api/eco?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/eco", (req, res) => {
-  const ticker = validateTicker(req.query.ticker);
-  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
-  const rows = parseRows(ticker);
-
-  if (rows.length === 0) {
-    return res.json({ ticker, data: [] });
-  }
-
+// ─── calcEco — reusable ECO calculation ──────────────────────────────────────
+function calcEco(rows) {
   const k25 = emaK(25), k13 = emaK(13), k8 = emaK(8);
   const avgVol = rows.reduce((s, r) => s + r.volume, 0) / rows.length;
 
@@ -121,7 +113,16 @@ app.get("/api/eco", (req, res) => {
     };
   });
 
-  res.json({ ticker, data });
+  return data;
+}
+
+// ─── GET /api/eco?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/eco", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcEco(rows) });
 });
 
 // ─── calcObv — reusable OBV calculation ──────────────────────────────────────
@@ -352,13 +353,8 @@ app.get("/api/demark", (req, res) => {
   res.json({ ticker, data: calcDemark(rows) });
 });
 
-// ─── GET /api/rsi?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/rsi", (req, res) => {
-  const ticker = validateTicker(req.query.ticker);
-  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
-  const rows = parseRows(ticker);
-  if (rows.length === 0) return res.json({ ticker, data: [] });
-
+// ─── calcRsi — reusable RSI calculation ──────────────────────────────────────
+function calcRsi(rows) {
   const period = 14;
   let avgGain = 0, avgLoss = 0;
 
@@ -383,16 +379,20 @@ app.get("/api/rsi", (req, res) => {
     return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), rsi: +rsi.toFixed(2) };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/macd?ticker=SPY ─────────────────────────────────────────────────
-app.get("/api/macd", (req, res) => {
+// ─── GET /api/rsi?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/rsi", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcRsi(rows) });
+});
 
+// ─── calcMacd — reusable MACD calculation ────────────────────────────────────
+function calcMacd(rows) {
   const k12 = emaK(12), k26 = emaK(26), k9 = emaK(9);
   let ema12 = rows[0].close, ema26 = rows[0].close, signalLine = 0;
 
@@ -409,16 +409,20 @@ app.get("/api/macd", (req, res) => {
     };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/bollinger?ticker=SPY ────────────────────────────────────────────
-app.get("/api/bollinger", (req, res) => {
+// ─── GET /api/macd?ticker=SPY ─────────────────────────────────────────────────
+app.get("/api/macd", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcMacd(rows) });
+});
 
+// ─── calcBollinger — reusable Bollinger calculation ──────────────────────────
+function calcBollinger(rows) {
   const period = 20, mult = 2;
 
   const data = rows.map((row, i) => {
@@ -442,16 +446,20 @@ app.get("/api/bollinger", (req, res) => {
     };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/atr?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/atr", (req, res) => {
+// ─── GET /api/bollinger?ticker=SPY ────────────────────────────────────────────
+app.get("/api/bollinger", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcBollinger(rows) });
+});
 
+// ─── calcAtr — reusable ATR calculation ──────────────────────────────────────
+function calcAtr(rows) {
   const period = 14;
   let atr = 0;
 
@@ -471,16 +479,20 @@ app.get("/api/atr", (req, res) => {
     };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/adx?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/adx", (req, res) => {
+// ─── GET /api/atr?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/atr", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcAtr(rows) });
+});
 
+// ─── calcAdx — reusable ADX calculation ──────────────────────────────────────
+function calcAdx(rows) {
   const period = 14;
   let smoothedPlusDM = 0, smoothedMinusDM = 0, smoothedTR = 0, adx = 0;
 
@@ -528,16 +540,20 @@ app.get("/api/adx", (req, res) => {
     };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/cci?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/cci", (req, res) => {
+// ─── GET /api/adx?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/adx", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcAdx(rows) });
+});
 
+// ─── calcCci — reusable CCI calculation ──────────────────────────────────────
+function calcCci(rows) {
   const period = 20;
 
   const data = rows.map((row, i) => {
@@ -560,16 +576,20 @@ app.get("/api/cci", (req, res) => {
     return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), cci: +cci.toFixed(2) };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/roc?ticker=SPY ──────────────────────────────────────────────────
-app.get("/api/roc", (req, res) => {
+// ─── GET /api/cci?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/cci", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcCci(rows) });
+});
 
+// ─── calcRoc — reusable ROC calculation ──────────────────────────────────────
+function calcRoc(rows) {
   const period = 12;
 
   const data = rows.map((row, i) => {
@@ -582,19 +602,22 @@ app.get("/api/roc", (req, res) => {
     return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), roc: +roc.toFixed(4) };
   });
 
-  res.json({ ticker, data });
-});
+  return data;
+}
 
-// ─── GET /api/williamsr?ticker=SPY ────────────────────────────────────────────
-app.get("/api/williamsr", (req, res) => {
+// ─── GET /api/roc?ticker=SPY ──────────────────────────────────────────────────
+app.get("/api/roc", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcRoc(rows) });
+});
 
+function calcWilliamsR(rows) {
   const period = 14;
 
-  const data = rows.map((row, i) => {
+  return rows.map((row, i) => {
     if (i < period - 1) {
       return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), williamsR: null };
     }
@@ -610,17 +633,18 @@ app.get("/api/williamsr", (req, res) => {
 
     return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), williamsR: +wr.toFixed(2) };
   });
+}
 
-  res.json({ ticker, data });
-});
-
-// ─── GET /api/stochrsi?ticker=SPY ─────────────────────────────────────────────
-app.get("/api/stochrsi", (req, res) => {
+// ─── GET /api/williamsr?ticker=SPY ────────────────────────────────────────────
+app.get("/api/williamsr", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcWilliamsR(rows) });
+});
 
+function calcStochRsi(rows) {
   const rsiPeriod = 14, stochPeriod = 14, kSmooth = 3, dSmooth = 3;
 
   // First compute RSI series
@@ -649,7 +673,7 @@ app.get("/api/stochrsi", (req, res) => {
   let kEma = 0.5, dEma = 0.5;
   const minLookback = rsiPeriod + stochPeriod - 1;
 
-  const data = rows.map((row, i) => {
+  return rows.map((row, i) => {
     if (i < minLookback) {
       return { date: row.date, close: +row.close.toFixed(2), volume: Math.round(row.volume), stochRsi: null, k: null, d: null };
     }
@@ -676,17 +700,18 @@ app.get("/api/stochrsi", (req, res) => {
       stochRsi: +stochRsi.toFixed(4), k: +kEma.toFixed(4), d: +dEma.toFixed(4),
     };
   });
+}
 
-  res.json({ ticker, data });
-});
-
-// ─── GET /api/ichimoku?ticker=SPY ─────────────────────────────────────────────
-app.get("/api/ichimoku", (req, res) => {
+// ─── GET /api/stochrsi?ticker=SPY ─────────────────────────────────────────────
+app.get("/api/stochrsi", (req, res) => {
   const ticker = validateTicker(req.query.ticker);
   if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
   const rows = parseRows(ticker);
   if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcStochRsi(rows) });
+});
 
+function calcIchimoku(rows) {
   function periodHL(start, end) {
     let high = -Infinity, low = Infinity;
     for (let j = Math.max(0, start); j <= end; j++) {
@@ -705,7 +730,7 @@ app.get("/api/ichimoku", (req, res) => {
     spanB[i] = i < 51 ? null : periodHL(i - 51, i);
   }
 
-  const data = rows.map((row, i) => {
+  return rows.map((row, i) => {
     const chikouIdx = i + 26;
 
     return {
@@ -717,8 +742,15 @@ app.get("/api/ichimoku", (req, res) => {
       chikou: chikouIdx < rows.length ? +rows[chikouIdx].close.toFixed(2) : null,
     };
   });
+}
 
-  res.json({ ticker, data });
+// ─── GET /api/ichimoku?ticker=SPY ─────────────────────────────────────────────
+app.get("/api/ichimoku", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+  res.json({ ticker, data: calcIchimoku(rows) });
 });
 
 // ─── GET /api/confluence?ticker=SPY ─────────────────────────────────────────
@@ -845,4 +877,4 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
-export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows, calcDemark, calcObv };
+export { app, validateTicker, emaK, calcEMA, calcDEMA, parseRows, calcDemark, calcObv, calcEco, calcRsi, calcMacd, calcBollinger, calcAtr, calcAdx, calcCci, calcRoc, calcWilliamsR, calcStochRsi, calcIchimoku };
