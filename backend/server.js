@@ -61,6 +61,19 @@ app.get("/api/tickers", (req, res) => {
   res.json([...tickers].sort());
 });
 
+// ─── GET /api/price?ticker=SPY ───────────────────────────────────────────────
+app.get("/api/price", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+  const data = rows.map(r => ({
+    date: r.date, open: +r.open.toFixed(2), high: +r.high.toFixed(2),
+    low: +r.low.toFixed(2), close: +r.close.toFixed(2), volume: Math.round(r.volume),
+  }));
+  res.json({ ticker, data });
+});
+
 // ─── Ticker validation ────────────────────────────────────────────────────────
 function validateTicker(raw) {
   const ticker = (raw || "SPY").toUpperCase();

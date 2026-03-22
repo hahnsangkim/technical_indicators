@@ -196,6 +196,7 @@ export default function Dashboard() {
   const [ticker, setTicker] = useState("SPY");
   const [activeIndicators, setActiveIndicators] = useState(["eco"]);
   const [indicatorData, setIndicatorData] = useState({});
+  const [priceData, setPriceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
   const [error, setError] = useState(null);
@@ -212,7 +213,7 @@ export default function Dashboard() {
       });
   }, []);
 
-  // Fetch all indicator data when ticker changes
+  // Fetch price data and all indicator data when ticker changes
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -220,15 +221,21 @@ export default function Dashboard() {
 
     const API_KEYS = { williamsR: "williamsr", stochRsi: "stochrsi" };
 
-    const fetches = activeIndicators.map(key => {
+    // Always fetch price data (independent of indicators)
+    const priceFetch = fetch(`${API}/api/price?ticker=${ticker}`, { signal: controller.signal })
+      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(res => res.data);
+
+    const indicatorFetches = activeIndicators.map(key => {
       const endpoint = API_KEYS[key] || key;
       return fetch(`${API}/api/${endpoint}?ticker=${ticker}`, { signal: controller.signal })
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
         .then(res => ({ key, data: res.data }));
     });
 
-    Promise.all(fetches)
-      .then(results => {
+    Promise.all([priceFetch, Promise.all(indicatorFetches)])
+      .then(([price, results]) => {
+        setPriceData(price);
         const newData = {};
         for (const k of Object.keys(INDICATORS)) newData[k] = null;
         for (const { key, data } of results) newData[key] = data;
@@ -306,18 +313,14 @@ export default function Dashboard() {
     setActiveIndicators(prev => {
       if (prev.includes(key)) {
         if (prev.length === 1) return prev; // keep at least one
-        const remaining = prev.filter(k => k !== key);
-        // Don't allow confluence as the only indicator (sparse data, no price chart)
-        if (remaining.length === 1 && remaining[0] === "confluence") return prev;
-        return remaining;
+        return prev.filter(k => k !== key);
       }
       return [...prev, key];
     });
   };
 
-  // Use whichever dataset is available for price chart / range filtering
-  // Exclude confluence (sparse events, not per-bar price data)
-  const primaryData = Object.entries(indicatorData).find(([k, d]) => k !== "confluence" && d && d.length > 0)?.[1] || null;
+  // Price data is fetched independently — always available regardless of active indicators
+  const primaryData = priceData;
 
   const filtered = useMemo(() => {
     if (!primaryData) return [];
