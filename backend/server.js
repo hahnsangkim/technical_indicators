@@ -767,29 +767,33 @@ app.get("/api/confluence", (req, res) => {
 
     // --- OBV_DIVERGENCE: only for Countdown-13 signals ---
     if (sb.signal.includes("COUNTDOWN_13")) {
-      let cdStartIdx = 0;
+      const expectedSetup = sb.signal.includes("BUY") ? "BUY_SETUP_9" : "SELL_SETUP_9";
+      let cdStartIdx = -1;
       for (let j = i - 1; j >= 0; j--) {
-        if (demarkData[j].signal && demarkData[j].signal.includes("SETUP_9")) {
+        if (demarkData[j].signal === expectedSetup) {
           cdStartIdx = j;
           break;
         }
       }
-      if (cdStartIdx < i) {
+      if (cdStartIdx >= 0 && cdStartIdx < i) {
         const priceStart = rows[cdStartIdx].close;
         const priceEnd = rows[i].close;
         const obvStart = obvData[cdStartIdx].obv;
         const obvEnd = obvData[i].obv;
-        const priceDir = priceEnd > priceStart ? "up" : "down";
-        const obvDir = obvEnd > obvStart ? "up" : "down";
-        if (priceDir !== obvDir) {
-          events.push({
-            date: sb.date,
-            signal: sb.signal,
-            type: "OBV_DIVERGENCE",
-            priceDirection: priceDir,
-            obvDirection: obvDir,
-            countdownSpanBars: i - cdStartIdx,
-          });
+        if (priceStart === priceEnd || obvStart === obvEnd) { /* skip flat */ }
+        else {
+          const priceDir = priceEnd > priceStart ? "up" : "down";
+          const obvDir = obvEnd > obvStart ? "up" : "down";
+          if (priceDir !== obvDir) {
+            events.push({
+              date: sb.date,
+              signal: sb.signal,
+              type: "OBV_DIVERGENCE",
+              priceDirection: priceDir,
+              obvDirection: obvDir,
+              countdownSpanBars: i - cdStartIdx,
+            });
+          }
         }
       }
     }
