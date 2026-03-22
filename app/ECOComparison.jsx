@@ -349,15 +349,47 @@ export default function Dashboard() {
     }));
   }, [filtered, filteredData]);
 
-  if (loading || !primaryData) return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
-      {error ? (
-        <div style={{ color: T.red, fontSize: 14, fontFamily: "monospace" }}>{error}</div>
-      ) : (
-        <div style={{ color: T.cyan, fontSize: 14, fontFamily: "monospace" }}>Loading {ticker} data…</div>
-      )}
-    </div>
-  );
+  if (loading || !primaryData) {
+    const skelStyle = {
+      background: `linear-gradient(90deg, ${T.panel} 25%, ${T.border} 50%, ${T.panel} 75%)`,
+      backgroundSize: "200% 100%",
+      animation: "shimmer 1.5s infinite",
+      borderRadius: 8,
+    };
+    return (
+      <div style={{ minHeight: "100vh", background: T.bg, padding: 20 }} data-testid="loading-skeleton">
+        <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+        {error ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh" }}>
+            <div style={{ color: T.red, fontSize: 14, fontFamily: "monospace" }}>{error}</div>
+          </div>
+        ) : (
+          <>
+            {/* Header skeleton */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+              <div style={{ ...skelStyle, width: 200, height: 36 }} />
+              <div style={{ ...skelStyle, width: 160, height: 36 }} />
+              <div style={{ ...skelStyle, width: 120, height: 36, marginLeft: "auto" }} />
+            </div>
+            {/* KPI cards skeleton */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+              {[...Array(4)].map((_, i) => (
+                <div key={i} style={{ ...skelStyle, height: 72 }} />
+              ))}
+            </div>
+            {/* Chart skeleton */}
+            <div style={{ ...skelStyle, height: 340, marginBottom: 20 }} />
+            {/* Stats skeleton */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} style={{ ...skelStyle, height: 100 }} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (primaryData.length === 0) return (
     <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>

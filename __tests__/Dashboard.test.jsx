@@ -48,10 +48,10 @@ describe("Dashboard", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows loading state initially", () => {
+  it("shows loading skeleton initially", () => {
     global.fetch = vi.fn(() => new Promise(() => {})); // never resolves
     render(<Dashboard />);
-    expect(screen.getByText(/Loading SPY data/)).toBeInTheDocument();
+    expect(screen.getByTestId("loading-skeleton")).toBeInTheDocument();
   });
 
   it("shows loading state when data is empty (no primary data)", async () => {
@@ -64,7 +64,7 @@ describe("Dashboard", () => {
     render(<Dashboard />);
     // Empty data means primaryData is null → loading screen persists
     await waitFor(() => {
-      expect(screen.getByText(/Loading/)).toBeInTheDocument();
+      expect(screen.getByTestId("loading-skeleton")).toBeInTheDocument();
     });
   });
 
@@ -73,7 +73,7 @@ describe("Dashboard", () => {
     global.fetch = mockFetchForIndicator("eco", ecoData);
     render(<Dashboard />);
     await waitFor(() => {
-      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("loading-skeleton")).not.toBeInTheDocument();
     });
     // Chart rendered (mocked)
     expect(screen.getAllByTestId("chart").length).toBeGreaterThan(0);
@@ -84,7 +84,7 @@ describe("Dashboard", () => {
     global.fetch = mockFetchForIndicator("eco", ecoData);
     render(<Dashboard />);
     await waitFor(() => {
-      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("loading-skeleton")).not.toBeInTheDocument();
     });
     // ECO-related KPI labels
     expect(screen.getByText("CLOSE")).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("Dashboard", () => {
     global.fetch = mockFetchForIndicator("eco", ecoData);
     render(<Dashboard />);
     await waitFor(() => {
-      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("loading-skeleton")).not.toBeInTheDocument();
     });
     expect(screen.getByText("3M")).toBeInTheDocument();
     expect(screen.getByText("6M")).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("Dashboard", () => {
     global.fetch = mockFetchForIndicator("eco", ecoData);
     render(<Dashboard />);
     await waitFor(() => {
-      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("loading-skeleton")).not.toBeInTheDocument();
     });
     // eco > signal => BULLISH
     expect(screen.getByText(/BULLISH/)).toBeInTheDocument();
