@@ -392,11 +392,11 @@ export default function Dashboard() {
     const isSell = payload._signal.direction === "sell";
     const color = isBuy ? T.lime : isSell ? T.red : T.gold;
     const label = isBuy ? "BUY" : isSell ? "SELL" : "";
-    const yOffset = isBuy ? 14 : -10;
+    const yOffset = isBuy ? 22 : -16;
     return (
       <g key={`sig-${payload.date}`}>
-        <circle cx={cx} cy={cy} r={5} fill={color} stroke="#fff" strokeWidth={1.5} />
-        {label && <text x={cx} y={cy + yOffset} textAnchor="middle" fill={color} fontSize={8} fontWeight={700} fontFamily="monospace">{label}</text>}
+        <circle cx={cx} cy={cy} r={6} fill={color} stroke="#fff" strokeWidth={1.5} />
+        {label && <text x={cx} y={cy + yOffset} textAnchor="middle" fill={color} fontSize={11} fontWeight={700} fontFamily="monospace">{label}</text>}
       </g>
     );
   };
