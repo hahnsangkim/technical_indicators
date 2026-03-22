@@ -198,6 +198,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
   const [error, setError] = useState(null);
+  const [signalData, setSignalData] = useState([]);
 
   useEffect(() => {
     fetch(`${API}/api/tickers`)
@@ -241,6 +242,16 @@ export default function Dashboard() {
 
     return () => controller.abort();
   }, [ticker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch signals for current ticker
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API}/api/signals?ticker=${ticker}`, { signal: controller.signal })
+      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(res => setSignalData(res.signals || []))
+      .catch(err => { if (err.name !== "AbortError") console.error("Signal fetch failed:", err); });
+    return () => controller.abort();
+  }, [ticker]);
 
   // Fetch only newly activated indicators (without full reload)
   useEffect(() => {
@@ -355,6 +366,22 @@ export default function Dashboard() {
       ...(ichByDate[row.date] || { tenkan: null, kijun: null, senkouA: null, senkouB: null, chikou: null }),
     }));
   }, [filtered, filteredData]);
+
+  // Merge signal markers into indicator data for chart display
+  const mergeSignals = (data, indicator) => {
+    if (!signalData.length || !data.length) return data;
+    const signalMap = {};
+    for (const s of signalData) {
+      if (s.indicator === indicator) signalMap[s.date] = s;
+    }
+    return data.map(d => ({ ...d, _signal: signalMap[d.date] || null }));
+  };
+
+  const signalDot = ({ cx, cy, payload }) => {
+    if (!payload || !payload._signal) return null;
+    const color = payload._signal.direction === "buy" ? T.lime : payload._signal.direction === "sell" ? T.red : T.gold;
+    return <circle key={`sig-${payload.date}`} cx={cx} cy={cy} r={5} fill={color} stroke="#fff" strokeWidth={1.5} />;
+  };
 
   if (loading || !primaryData) {
     const skelStyle = {
@@ -805,7 +832,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.eco} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.eco, "eco")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.eco.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
@@ -817,7 +844,7 @@ export default function Dashboard() {
                     const c = payload.histogram >= 0 ? T.lime : T.red;
                     return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
                   }} />
-                <Line type="monotone" dataKey="eco" stroke={T.cyan} strokeWidth={2} dot={false} name="ECO" />
+                <Line type="monotone" dataKey="eco" stroke={T.cyan} strokeWidth={2} dot={signalDot} name="ECO" />
                 <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
               </ComposedChart>
             </ResponsiveContainer>
@@ -835,7 +862,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.obv} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.obv, "obv")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="obvGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={T.purple} stopOpacity={0.25} />
@@ -849,7 +876,7 @@ export default function Dashboard() {
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }}
                   formatter={(v) => [fmtVol(v), ""]} />
-                <Area type="monotone" dataKey="obv" stroke={T.purple} fill="url(#obvGrad)" strokeWidth={2} dot={false} name="OBV" />
+                <Area type="monotone" dataKey="obv" stroke={T.purple} fill="url(#obvGrad)" strokeWidth={2} dot={signalDot} name="OBV" />
                 <Line type="monotone" dataKey="obvEma" stroke={T.gold} strokeWidth={1.5} dot={false} name="EMA(20)" strokeDasharray="4 2" />
               </ComposedChart>
             </ResponsiveContainer>
@@ -936,7 +963,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.rsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.rsi, "rsi")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.rsi.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, 100]} width={30} />
@@ -945,7 +972,7 @@ export default function Dashboard() {
                 <ReferenceLine y={70} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
                 <ReferenceLine y={50} stroke={T.border} strokeDasharray="3 3" />
                 <ReferenceLine y={30} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="rsi" stroke={INDICATORS.rsi.color} fill={`${INDICATORS.rsi.color}15`} strokeWidth={2} dot={false} name="RSI" />
+                <Area type="monotone" dataKey="rsi" stroke={INDICATORS.rsi.color} fill={`${INDICATORS.rsi.color}15`} strokeWidth={2} dot={signalDot} name="RSI" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -963,7 +990,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.macd} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.macd, "macd")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.macd.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
@@ -975,7 +1002,7 @@ export default function Dashboard() {
                     const c = payload.histogram >= 0 ? T.lime : T.red;
                     return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={c} opacity={0.4} rx={1} />;
                   }} />
-                <Line type="monotone" dataKey="macd" stroke={INDICATORS.macd.color} strokeWidth={2} dot={false} name="MACD" />
+                <Line type="monotone" dataKey="macd" stroke={INDICATORS.macd.color} strokeWidth={2} dot={signalDot} name="MACD" />
                 <Line type="monotone" dataKey="signal" stroke={T.gold} strokeWidth={1.5} dot={false} name="Signal" strokeDasharray="4 2" />
               </ComposedChart>
             </ResponsiveContainer>
@@ -992,13 +1019,13 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={180}>
-              <ComposedChart data={filteredData.atr} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.atr, "atr")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.atr.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
-                <Area type="monotone" dataKey="atr" stroke={INDICATORS.atr.color} fill={`${INDICATORS.atr.color}15`} strokeWidth={2} dot={false} name="ATR" />
+                <Area type="monotone" dataKey="atr" stroke={INDICATORS.atr.color} fill={`${INDICATORS.atr.color}15`} strokeWidth={2} dot={signalDot} name="ATR" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -1016,14 +1043,14 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.adx} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.adx, "adx")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.adx.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, "auto"]} width={30} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
                 <ReferenceLine y={25} stroke={T.border} strokeDasharray="3 3" />
-                <Line type="monotone" dataKey="adx" stroke={INDICATORS.adx.color} strokeWidth={2} dot={false} name="ADX" />
+                <Line type="monotone" dataKey="adx" stroke={INDICATORS.adx.color} strokeWidth={2} dot={signalDot} name="ADX" />
                 <Line type="monotone" dataKey="plusDI" stroke={T.lime} strokeWidth={1.5} dot={false} name="+DI" />
                 <Line type="monotone" dataKey="minusDI" stroke={T.red} strokeWidth={1.5} dot={false} name="-DI" />
               </ComposedChart>
@@ -1043,7 +1070,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.cci} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.cci, "cci")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="cciGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={INDICATORS.cci.color} stopOpacity={0.25} />
@@ -1058,7 +1085,7 @@ export default function Dashboard() {
                 <ReferenceLine y={100} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
                 <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
                 <ReferenceLine y={-100} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="cci" stroke={INDICATORS.cci.color} fill="url(#cciGrad)" strokeWidth={2} dot={false} name="CCI" />
+                <Area type="monotone" dataKey="cci" stroke={INDICATORS.cci.color} fill="url(#cciGrad)" strokeWidth={2} dot={signalDot} name="CCI" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -1075,14 +1102,14 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.roc} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.roc, "roc")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.roc.length / 6)} />
                 <YAxis tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} width={50} />
                 <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, color: T.text }}
                   labelStyle={{ color: T.sub }} />
                 <ReferenceLine y={0} stroke={T.border} strokeDasharray="3 3" />
-                <Area type="monotone" dataKey="roc" stroke={INDICATORS.roc.color} fill={`${INDICATORS.roc.color}15`} strokeWidth={2} dot={false} name="ROC" />
+                <Area type="monotone" dataKey="roc" stroke={INDICATORS.roc.color} fill={`${INDICATORS.roc.color}15`} strokeWidth={2} dot={signalDot} name="ROC" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -1100,7 +1127,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.williamsR} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.williamsR, "williamsR")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.williamsR.length / 6)} />
                 <YAxis domain={[-100, 0]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
@@ -1108,7 +1135,7 @@ export default function Dashboard() {
                   labelStyle={{ color: T.sub }} />
                 <ReferenceLine y={-20} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
                 <ReferenceLine y={-80} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area type="monotone" dataKey="williamsR" stroke={INDICATORS.williamsR.color} fill={`${INDICATORS.williamsR.color}15`} strokeWidth={2} dot={false} name="Williams %R" />
+                <Area type="monotone" dataKey="williamsR" stroke={INDICATORS.williamsR.color} fill={`${INDICATORS.williamsR.color}15`} strokeWidth={2} dot={signalDot} name="Williams %R" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -1127,7 +1154,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={filteredData.stochRsi} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={mergeSignals(filteredData.stochRsi, "stochRsi")} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <XAxis dataKey="date" tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={{ stroke: T.border }}
                   tickFormatter={d => d.slice(5)} interval={Math.floor(filteredData.stochRsi.length / 6)} />
                 <YAxis domain={[0, 1]} tick={{ fill: T.muted, fontSize: 9 }} tickLine={false} axisLine={false} width={30} />
@@ -1136,7 +1163,7 @@ export default function Dashboard() {
                 <ReferenceLine y={0.8} stroke={T.red} strokeDasharray="3 3" strokeOpacity={0.5} />
                 <ReferenceLine y={0.5} stroke={T.border} strokeDasharray="3 3" />
                 <ReferenceLine y={0.2} stroke={T.lime} strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Line type="monotone" dataKey="k" stroke={INDICATORS.stochRsi.color} strokeWidth={2} dot={false} name="%K" />
+                <Line type="monotone" dataKey="k" stroke={INDICATORS.stochRsi.color} strokeWidth={2} dot={signalDot} name="%K" />
                 <Line type="monotone" dataKey="d" stroke={T.purple} strokeWidth={1.5} dot={false} name="%D" strokeDasharray="4 2" />
               </ComposedChart>
             </ResponsiveContainer>
