@@ -30,6 +30,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | `Dashboard` | Main layout, state management, chart rendering |
 | `TickerSearch` | Searchable dropdown for 487 S&P 500 tickers |
 | `IndicatorMenu` | Multi-select indicator toggle (14 indicators) |
+| `WatchlistPanel` | Ticker watchlist with grouped signal display + notifications |
 
 ### Key Patterns
 
@@ -70,6 +71,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | `/api/stochrsi?ticker=SPY` | GET | Stochastic RSI (14, 14, 3, 3) |
 | `/api/ichimoku?ticker=SPY` | GET | Ichimoku Cloud (9, 26, 52) |
 | `/api/confluence?ticker=SPY` | GET | Volume Confluence (DeMark + OBV) |
+| `/api/signals?ticker=SPY` | GET | Signal detection across all indicators (last 10 bars) |
 | `/api/health` | GET | Health check with row count |
 
 ### Input Validation
@@ -286,7 +288,7 @@ Reuses `calcDemark()` and `calcObv()` internally (shared functions also used by 
 ### Backend Tests (vitest + supertest)
 
 ```bash
-cd backend && npm test       # 149 tests
+cd backend && npm test       # 166 tests
 cd backend && npm run test:watch  # watch mode
 ```
 
@@ -298,11 +300,13 @@ cd backend && npm run test:watch  # watch mode
 | `__tests__/errors.test.js` | 16 | CORS headers, concurrent requests, response time (<200ms per endpoint) |
 | `__tests__/confluence.test.js` | 11 | calcDemark/calcObv extraction, confluence endpoint (3 event types, validation, field checks) |
 | `__tests__/cache.test.js` | 1 | parseRows caching (referential identity) |
+| `__tests__/calcFunctions.test.js` | 11 | All 11 extracted calc functions (field structure validation) |
+| `__tests__/signals.test.js` | 6 | Signal detection endpoint (shape, validation, sorting, field checks) |
 
 ### Frontend Tests (vitest + jsdom + React Testing Library)
 
 ```bash
-npm test                     # 23 tests
+npm test                     # 28 tests
 npm run test:watch           # watch mode
 ```
 
@@ -312,10 +316,11 @@ npm run test:watch           # watch mode
 | `__tests__/TickerSearch.test.jsx` | 5 | Dropdown open, search filter, max results, selection, ticker count |
 | `__tests__/IndicatorMenu.test.jsx` | 4 | Badge count, toggle callback, 13 indicators listed, unique colors |
 | `__tests__/Dashboard.test.jsx` | 9 | Loading skeleton, empty data, chart render, KPI cards, range buttons, signal badge, error UI, confluence |
+| `__tests__/WatchlistPanel.test.jsx` | 5 | Watchlist rendering, signal rows, empty state, close handler, signal count |
 
 ### Test Architecture
 
-- **Backend** exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA`, `parseRows`, `calcDemark`, `calcObv` for testing (server only listens when run directly)
+- **Backend** exports `app`, `validateTicker`, `emaK`, `calcEMA`, `calcDEMA`, `parseRows`, `calcDemark`, `calcObv`, `calcEco`, `calcRsi`, `calcMacd`, `calcBollinger`, `calcAtr`, `calcAdx`, `calcCci`, `calcRoc`, `calcWilliamsR`, `calcStochRsi`, `calcIchimoku` for testing (server only listens when run directly)
 - **Frontend** exports `TickerSearch`, `IndicatorMenu`, `fmtVol`, `INDICATORS`, `T` as named exports
 - Recharts is mocked in Dashboard tests to avoid canvas/SVG issues in jsdom
 
