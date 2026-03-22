@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
+import WatchlistPanel from "./WatchlistPanel";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -199,6 +200,7 @@ export default function Dashboard() {
   const [range, setRange] = useState("1Y");
   const [error, setError] = useState(null);
   const [signalData, setSignalData] = useState([]);
+  const [showWatchlist, setShowWatchlist] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/api/tickers`)
@@ -736,6 +738,11 @@ export default function Dashboard() {
           </div>
           <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <IndicatorMenu active={activeIndicators} onToggle={toggleIndicator} />
+            <button onClick={() => setShowWatchlist(!showWatchlist)} style={{
+              background: showWatchlist ? T.borderHi : T.panel, border: `1px solid ${T.border}`,
+              borderRadius: 6, color: T.text, cursor: "pointer", fontSize: 11, padding: "6px 12px",
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}>Watchlist</button>
             {/* Signal badge */}
             <div style={{ padding: "6px 14px", borderRadius: 6, background: `${sigColor}15`, border: `1px solid ${sigColor}40` }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: sigColor }}>{sigLabel}</span>
@@ -1464,6 +1471,13 @@ export default function Dashboard() {
         </div>
 
       </div>
+      {showWatchlist && (
+        <WatchlistPanel
+          tickers={tickers}
+          onSelectTicker={(t) => { setTicker(t); setShowWatchlist(false); }}
+          onClose={() => setShowWatchlist(false)}
+        />
+      )}
     </div>
   );
 }
