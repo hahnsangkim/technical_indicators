@@ -721,6 +721,107 @@ app.get("/api/ichimoku", (req, res) => {
   res.json({ ticker, data });
 });
 
+// ─── GET /api/confluence?ticker=SPY ─────────────────────────────────────────
+app.get("/api/confluence", (req, res) => {
+  const ticker = validateTicker(req.query.ticker);
+  if (!ticker) return res.status(400).json({ error: "Invalid ticker" });
+  const rows = parseRows(ticker);
+  if (rows.length === 0) return res.json({ ticker, data: [] });
+
+  const demarkData = calcDemark(rows);
+  const obvData = calcObv(rows);
+  const events = [];
+
+  // 20-bar rolling average volume
+  const avgVol = new Array(rows.length);
+  let volSum = 0;
+  for (let i = 0; i < rows.length; i++) {
+    volSum += rows[i].volume;
+    if (i >= 20) volSum -= rows[i - 20].volume;
+    avgVol[i] = i >= 19 ? volSum / 20 : volSum / (i + 1);
+  }
+
+  // Build index of signal bars
+  const signalBars = [];
+  for (let i = 0; i < demarkData.length; i++) {
+    if (demarkData[i].signal) {
+      signalBars.push({ idx: i, ...demarkData[i] });
+    }
+  }
+
+  for (const sb of signalBars) {
+    const i = sb.idx;
+
+    // --- CAPITULATION: volume > 2x 20-bar average ---
+    const ratio = rows[i].volume / avgVol[i];
+    if (ratio > 2) {
+      events.push({
+        date: sb.date,
+        signal: sb.signal,
+        type: "CAPITULATION",
+        volume: Math.round(rows[i].volume),
+        avgVolume: Math.round(avgVol[i]),
+        volumeRatio: +ratio.toFixed(2),
+      });
+    }
+
+    // --- OBV_DIVERGENCE: only for Countdown-13 signals ---
+    if (sb.signal.includes("COUNTDOWN_13")) {
+      let cdStartIdx = 0;
+      for (let j = i - 1; j >= 0; j--) {
+        if (demarkData[j].signal && demarkData[j].signal.includes("SETUP_9")) {
+          cdStartIdx = j;
+          break;
+        }
+      }
+      if (cdStartIdx < i) {
+        const priceStart = rows[cdStartIdx].close;
+        const priceEnd = rows[i].close;
+        const obvStart = obvData[cdStartIdx].obv;
+        const obvEnd = obvData[i].obv;
+        const priceDir = priceEnd > priceStart ? "up" : "down";
+        const obvDir = obvEnd > obvStart ? "up" : "down";
+        if (priceDir !== obvDir) {
+          events.push({
+            date: sb.date,
+            signal: sb.signal,
+            type: "OBV_DIVERGENCE",
+            priceDirection: priceDir,
+            obvDirection: obvDir,
+            countdownSpanBars: i - cdStartIdx,
+          });
+        }
+      }
+    }
+
+    // --- POST_SIGNAL: check 3 bars after signal ---
+    if (i + 3 < rows.length) {
+      const postBars = rows.slice(i + 1, i + 4);
+      const avgPostVol = postBars.reduce((s, r) => s + r.volume, 0) / 3;
+      const isBuySignal = sb.signal.startsWith("BUY");
+
+      let followThrough = false;
+      if (isBuySignal) {
+        followThrough = postBars.some(b => b.close > b.open && b.volume > avgVol[i]);
+      } else {
+        followThrough = postBars.some(b => b.close < b.open && b.volume > avgVol[i]);
+      }
+
+      events.push({
+        date: postBars[2].date,
+        signal: sb.signal,
+        type: "POST_SIGNAL",
+        barsAfter: 3,
+        validation: followThrough ? "CONFIRMED" : "FAILED",
+        avgPostVolume: Math.round(avgPostVol),
+        avgVolume: Math.round(avgVol[i]),
+      });
+    }
+  }
+
+  res.json({ ticker, data: events });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", tickers: csvLines.length - 1 });
