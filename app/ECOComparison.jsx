@@ -388,8 +388,17 @@ export default function Dashboard() {
 
   const signalDot = ({ cx, cy, payload }) => {
     if (!payload || !payload._signal) return null;
-    const color = payload._signal.direction === "buy" ? T.lime : payload._signal.direction === "sell" ? T.red : T.gold;
-    return <circle key={`sig-${payload.date}`} cx={cx} cy={cy} r={5} fill={color} stroke="#fff" strokeWidth={1.5} />;
+    const isBuy = payload._signal.direction === "buy";
+    const isSell = payload._signal.direction === "sell";
+    const color = isBuy ? T.lime : isSell ? T.red : T.gold;
+    const label = isBuy ? "BUY" : isSell ? "SELL" : "";
+    const yOffset = isBuy ? 14 : -10;
+    return (
+      <g key={`sig-${payload.date}`}>
+        <circle cx={cx} cy={cy} r={5} fill={color} stroke="#fff" strokeWidth={1.5} />
+        {label && <text x={cx} y={cy + yOffset} textAnchor="middle" fill={color} fontSize={8} fontWeight={700} fontFamily="monospace">{label}</text>}
+      </g>
+    );
   };
 
   if (loading || !primaryData) {
