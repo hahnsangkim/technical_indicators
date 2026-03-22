@@ -114,4 +114,25 @@ describe("Dashboard", () => {
     // eco > signal => BULLISH
     expect(screen.getByText(/BULLISH/)).toBeInTheDocument();
   });
+
+  it("shows error message when indicator fetch fails", async () => {
+    global.fetch = vi.fn((url) => {
+      if (url.includes("/api/tickers")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_TICKERS) });
+      }
+      return Promise.resolve({ ok: false, statusText: "Internal Server Error" });
+    });
+    render(<Dashboard />);
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows error message when network request fails", async () => {
+    global.fetch = vi.fn(() => Promise.reject(new Error("Network error")));
+    render(<Dashboard />);
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load/i)).toBeInTheDocument();
+    });
+  });
 });

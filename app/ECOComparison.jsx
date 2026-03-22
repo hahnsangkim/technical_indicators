@@ -196,18 +196,23 @@ export default function Dashboard() {
   const [indicatorData, setIndicatorData] = useState({});
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("1Y");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetch(`${API}/api/tickers`)
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
       .then(setTickers)
-      .catch(err => console.error("Failed to load tickers:", err));
+      .catch(err => {
+        console.error("Failed to load tickers:", err);
+        setError("Failed to load ticker list. Please refresh.");
+      });
   }, []);
 
   // Fetch all indicator data when ticker changes
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
+    setError(null);
 
     const API_KEYS = { williamsR: "williamsr", stochRsi: "stochrsi" };
 
@@ -225,7 +230,12 @@ export default function Dashboard() {
         for (const { key, data } of results) newData[key] = data;
         setIndicatorData(newData);
       })
-      .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); })
+      .catch(err => {
+        if (err.name !== "AbortError") {
+          console.error("Indicator fetch failed:", err);
+          setError("Failed to load indicator data. Please try again.");
+        }
+      })
       .finally(() => setLoading(false));
 
     return () => controller.abort();
@@ -267,7 +277,12 @@ export default function Dashboard() {
           return next;
         });
       })
-      .catch(err => { if (err.name !== "AbortError") console.error("Indicator fetch failed:", err); });
+      .catch(err => {
+        if (err.name !== "AbortError") {
+          console.error("Indicator fetch failed:", err);
+          setError("Failed to load indicator data. Please try again.");
+        }
+      });
 
     return () => controller.abort();
   }, [activeIndicators]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -334,8 +349,12 @@ export default function Dashboard() {
   }, [filtered, filteredData]);
 
   if (loading || !primaryData) return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: T.cyan, fontSize: 14, fontFamily: "monospace" }}>Loading {ticker} data…</div>
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+      {error ? (
+        <div style={{ color: T.red, fontSize: 14, fontFamily: "monospace" }}>{error}</div>
+      ) : (
+        <div style={{ color: T.cyan, fontSize: 14, fontFamily: "monospace" }}>Loading {ticker} data…</div>
+      )}
     </div>
   );
 
@@ -605,6 +624,21 @@ export default function Dashboard() {
           .kpi-value { font-size: 16px !important; }
         }
       `}</style>
+
+      {error && (
+        <div style={{
+          background: "rgba(255,70,70,0.15)", border: `1px solid ${T.red}`,
+          color: T.red, padding: "8px 16px", borderRadius: 6,
+          fontFamily: "monospace", fontSize: 13, margin: "0 0 12px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} style={{
+            background: "none", border: "none", color: T.red, cursor: "pointer",
+            fontSize: 16, fontFamily: "monospace", padding: "0 4px",
+          }}>✕</button>
+        </div>
+      )}
 
       {/* HEADER */}
       <div style={{
