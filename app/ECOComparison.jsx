@@ -4,6 +4,7 @@ import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import WatchlistPanel from "./WatchlistPanel";
+import Link from "next/link";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -664,6 +665,11 @@ export default function Dashboard() {
               borderRadius: 6, color: T.text, cursor: "pointer", fontSize: 11, padding: "6px 12px",
               fontFamily: "'IBM Plex Sans', sans-serif",
             }}>Watchlist</button>
+            <Link href="/strategies" style={{
+              background: T.panel, border: `1px solid ${T.border}`,
+              borderRadius: 6, color: T.text, cursor: "pointer", fontSize: 11, padding: "6px 12px",
+              fontFamily: "'IBM Plex Sans', sans-serif", textDecoration: "none", display: "inline-block",
+            }}>Strategies</Link>
             {/* Signal badge */}
             <div style={{ padding: "6px 14px", borderRadius: 6, background: `${sigColor}15`, border: `1px solid ${sigColor}40` }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: sigColor }}>{sigLabel}</span>
