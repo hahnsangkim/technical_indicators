@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import {
   ComposedChart, Area, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import WatchlistPanel from "./WatchlistPanel";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -192,7 +193,8 @@ function fmtVol(n) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export { TickerSearch, IndicatorMenu, fmtVol, INDICATORS, T };
 
-export default function Dashboard() {
+function DashboardInner() {
+  const searchParams = useSearchParams();
   const [tickers, setTickers] = useState([]);
   const [ticker, setTicker] = useState("SPY");
   const [activeIndicators, setActiveIndicators] = useState(["eco"]);
@@ -203,6 +205,44 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [signalData, setSignalData] = useState([]);
   const [showWatchlist, setShowWatchlist] = useState(false);
+  const [strategyResults, setStrategyResults] = useState([]);
+
+  // Fetch strategy results when ticker changes (if strategies are active)
+  useEffect(() => {
+    const strategiesParam = searchParams.get("strategies");
+    let strategies = [];
+    try {
+      strategies = JSON.parse(localStorage.getItem("trading_strategies") || "[]");
+    } catch { /* ignore parse errors */ }
+    const activeStrategies = strategies.filter(s => s.active);
+    if (activeStrategies.length === 0 && strategiesParam !== "active") {
+      setStrategyResults([]);
+      return;
+    }
+    if (activeStrategies.length === 0) {
+      setStrategyResults([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetch(`${API}/api/strategy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker, strategies: activeStrategies }),
+      signal: controller.signal,
+    })
+      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(res => setStrategyResults(res.results || []))
+      .catch(err => { if (err.name !== "AbortError") console.error("Strategy fetch failed:", err); });
+    return () => controller.abort();
+  }, [ticker, searchParams]);
+
+  // Count active strategies for badge
+  const activeStrategyCount = useMemo(() => {
+    try {
+      const strategies = JSON.parse(localStorage.getItem("trading_strategies") || "[]");
+      return strategies.filter(s => s.active).length;
+    } catch { return 0; }
+  }, [strategyResults]); // re-evaluate when strategyResults change (proxy for localStorage read)
 
   useEffect(() => {
     fetch(`${API}/api/tickers`)
@@ -401,6 +441,46 @@ export default function Dashboard() {
       </g>
     );
   };
+
+  // Merge strategy buy/sell results into price chart data by date
+  const mergeStrategyResults = (data) => {
+    if (!strategyResults.length || !data.length) return data;
+    const stratMap = {};
+    for (const s of strategyResults) {
+      stratMap[s.date] = s;
+    }
+    return data.map(d => ({
+      ...d,
+      strategyAction: stratMap[d.date] ? d.close : null,
+      _strategy: stratMap[d.date] || null,
+    }));
+  };
+
+  const strategyDot = ({ cx, cy, payload }) => {
+    if (!payload || !payload._strategy) return null;
+    const action = payload._strategy.action;
+    const isBuy = action === "BUY" || action === "buy";
+    const isSell = action === "SELL" || action === "sell";
+    if (!isBuy && !isSell) return null;
+    const color = isBuy ? T.lime : T.red;
+    const label = isBuy ? "BUY" : "SELL";
+    // Triangle pointing up for BUY, down for SELL
+    const size = 10;
+    const half = size / 2;
+    const trianglePath = isBuy
+      ? `M${cx},${cy - half} L${cx - half},${cy + half} L${cx + half},${cy + half} Z`
+      : `M${cx},${cy + half} L${cx - half},${cy - half} L${cx + half},${cy - half} Z`;
+    const yOffset = isBuy ? -half - 10 : half + 14;
+    return (
+      <g key={`strat-${payload.date}`}>
+        <path d={trianglePath} fill={color} stroke="#fff" strokeWidth={1} />
+        <text x={cx} y={cy + yOffset} textAnchor="middle" fill={color} fontSize={9} fontWeight={700} fontFamily="monospace">{label}</text>
+      </g>
+    );
+  };
+
+  // Price data with strategy markers merged
+  const priceWithStrategy = useMemo(() => mergeStrategyResults(priceWithRisk), [priceWithRisk, strategyResults]);
 
   if (loading || !primaryData) {
     const skelStyle = {
@@ -668,8 +748,13 @@ export default function Dashboard() {
             <Link href="/strategies" style={{
               background: T.panel, border: `1px solid ${T.border}`,
               borderRadius: 6, color: T.text, cursor: "pointer", fontSize: 11, padding: "6px 12px",
-              fontFamily: "'IBM Plex Sans', sans-serif", textDecoration: "none", display: "inline-block",
-            }}>Strategies</Link>
+              fontFamily: "'IBM Plex Sans', sans-serif", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
+            }}>Strategies{activeStrategyCount > 0 && (
+              <span style={{
+                background: T.lime, color: "#000", fontSize: 9, fontWeight: 800,
+                borderRadius: 4, padding: "1px 5px", minWidth: 16, textAlign: "center",
+              }}>{activeStrategyCount}</span>
+            )}</Link>
             {/* Signal badge */}
             <div style={{ padding: "6px 14px", borderRadius: 6, background: `${sigColor}15`, border: `1px solid ${sigColor}40` }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: sigColor }}>{sigLabel}</span>
@@ -706,7 +791,7 @@ export default function Dashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={180}>
-              <ComposedChart data={priceWithRisk} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <ComposedChart data={priceWithStrategy} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={T.cyan} stopOpacity={0.3} />
@@ -727,6 +812,9 @@ export default function Dashboard() {
                     <Area type="monotone" dataKey="bbLower" stroke={INDICATORS.bollinger.color} fill={`${INDICATORS.bollinger.color}10`} strokeWidth={1} strokeDasharray="4 2" dot={false} name="BB Lower" />
                     <Line type="monotone" dataKey="bbMiddle" stroke={INDICATORS.bollinger.color} strokeWidth={1} strokeDasharray="2 2" dot={false} name="BB Middle" strokeOpacity={0.5} />
                   </>
+                )}
+                {strategyResults.length > 0 && (
+                  <Line type="monotone" dataKey="strategyAction" stroke="transparent" strokeWidth={0} dot={strategyDot} name="Strategy" connectNulls={false} isAnimationActive={false} />
                 )}
               </ComposedChart>
             </ResponsiveContainer>
@@ -1468,5 +1556,13 @@ export default function Dashboard() {
         />
       )}
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: T.bg }} />}>
+      <DashboardInner />
+    </Suspense>
   );
 }
