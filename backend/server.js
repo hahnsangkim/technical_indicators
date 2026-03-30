@@ -29,6 +29,7 @@ import signalsRouter from "./routes/signals.js";
 import confluenceRouter from "./routes/confluence.js";
 import adminRouter from "./routes/admin.js";
 import strategyRouter from "./routes/strategy.js";
+import generateStrategyRouter from "./routes/generateStrategy.js";
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 const app = express();
@@ -64,6 +65,7 @@ app.use("/api", signalsRouter);
 app.use("/api", confluenceRouter);
 app.use("/api", adminRouter);
 app.use("/api", strategyRouter);
+app.use("/api", generateStrategyRouter);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
