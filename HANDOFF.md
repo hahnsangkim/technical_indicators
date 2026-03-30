@@ -1,20 +1,20 @@
 # Session Handoff - Technical Indicators Dashboard
 
-> **Last Updated:** 2026-03-21
-> **Last Commit:** `0ff8e4a` - chore: update package-lock.json
+> **Last Updated:** 2026-03-29
+> **Last Commit:** `543e946` - test: add strategy page frontend tests
 > **Branch:** main
 
 ---
 
 ## Current State
 
-**Multi-indicator dashboard with 14 indicators** is fully implemented, tested, deployed, and responsive.
+**Multi-indicator dashboard with 14 indicators and strategy builder** is fully implemented, tested, deployed, and responsive.
 
 ### What's Done
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Backend Express API | ✅ Complete | 16 endpoints (14 indicators + price + signals + tickers + health) |
+| Backend Express API | ✅ Complete | 18 endpoints (14 indicators + price + signals + tickers + health + strategy + generate-strategy) |
 | CSV data loading | ✅ Complete | 487 tickers, loaded once at startup |
 | Input validation | ✅ Complete | Regex validation, 400 on invalid ticker |
 | Error handling | ✅ Complete | Global handler, CSV load failure, CORS, frontend error banners |
@@ -34,19 +34,25 @@
 | Watchlist panel | ✅ Complete | Multi-ticker watchlist with grouped signals, localStorage persistence |
 | Browser notifications | ✅ Complete | Notification API, 5-min refresh, new signal detection |
 | Extracted calc functions | ✅ Complete | All 13 indicators extracted into reusable `calcXxx(rows)` functions |
+| Strategy builder | ✅ Complete | AI-powered + manual condition editor, saved strategies, buy/sell chart markers |
+| Strategy evaluation engine | ✅ Complete | Threshold + crossover conditions, evaluates against indicator data per bar |
+| Strategy API endpoints | ✅ Complete | POST /api/strategy (evaluate) + POST /api/generate-strategy (AI parse) |
+| Dashboard strategy markers | ✅ Complete | Buy/sell triangles on price chart when `?strategies=active` |
 | Responsive layout | ✅ Complete | Mobile/tablet breakpoints at 768px and 480px |
 | Vercel deployment | ✅ Complete | Frontend + backend separately deployed |
 | ARCHITECTURE.md | ✅ Complete | Full system documentation for all 13 indicators |
 | TEST_SPECIFICATION.md | ✅ Complete | 150+ test cases specified for all endpoints |
-| Backend tests | ✅ Complete | 166 tests (vitest + supertest) |
-| Frontend tests | ✅ Complete | 28 tests (vitest + jsdom + RTL) |
+| Backend tests | ✅ Complete | 213 tests (vitest + supertest, 15 test files) |
+| Frontend tests | ✅ Complete | 44 tests (vitest + jsdom + RTL, 6 test files) |
+| E2E tests | ✅ Complete | 14 tests (Playwright, 2 spec files) |
 
 ### Test Status
 
 ```
-Backend:  166 tests passing (8 test files)
-Frontend:  28 tests passing (5 test files)
-Total:    194 tests passing
+Backend:  213 tests passing (15 test files)
+Frontend:  44 tests passing (6 test files)
+E2E:      14 tests (2 spec files, requires running server)
+Total:    257+ tests
 ```
 
 ### Deployment
@@ -66,9 +72,13 @@ No remaining tasks. All features implemented.
 ## Key Files
 
 ### Core Application
-- [app/ECOComparison.jsx](app/ECOComparison.jsx) - Main dashboard component with signal markers
+- [app/ECOComparison.jsx](app/ECOComparison.jsx) - Main dashboard component with signal + strategy markers
+- [app/strategies/page.jsx](app/strategies/page.jsx) - Strategy Builder page (AI input, manual editor, saved strategies)
 - [app/WatchlistPanel.jsx](app/WatchlistPanel.jsx) - Watchlist panel with grouped signals + notifications
-- [backend/server.js](backend/server.js) - Express API with price + 14 indicators + signals endpoint
+- [backend/server.js](backend/server.js) - Express API with price + 14 indicators + signals + strategy endpoints
+- [backend/lib/strategyEngine.js](backend/lib/strategyEngine.js) - Strategy evaluation engine (threshold + crossover conditions)
+- [backend/routes/strategy.js](backend/routes/strategy.js) - POST /api/strategy endpoint
+- [backend/routes/generateStrategy.js](backend/routes/generateStrategy.js) - POST /api/generate-strategy (AI-powered, Claude API)
 
 ### Tests
 - [backend/__tests__/math.test.js](backend/__tests__/math.test.js) - EMA/DEMA unit tests (9 tests)
@@ -79,11 +89,17 @@ No remaining tasks. All features implemented.
 - [backend/__tests__/confluence.test.js](backend/__tests__/confluence.test.js) - calcDemark/calcObv extraction + confluence endpoint (11 tests)
 - [backend/__tests__/calcFunctions.test.js](backend/__tests__/calcFunctions.test.js) - All 11 extracted calc functions (11 tests)
 - [backend/__tests__/signals.test.js](backend/__tests__/signals.test.js) - Signal detection endpoint (6 tests)
+- [backend/__tests__/strategyEngine.test.js](backend/__tests__/strategyEngine.test.js) - Strategy engine unit tests (7 tests)
+- [backend/__tests__/strategyEndpoint.test.js](backend/__tests__/strategyEndpoint.test.js) - Strategy endpoint integration tests (6 tests)
+- [backend/__tests__/generateStrategy.test.js](backend/__tests__/generateStrategy.test.js) - AI strategy generation validation tests (2 tests)
 - [__tests__/fmtVol.test.js](__tests__/fmtVol.test.js) - Volume formatting (5 tests)
 - [__tests__/TickerSearch.test.jsx](__tests__/TickerSearch.test.jsx) - Ticker search component (5 tests)
 - [__tests__/IndicatorMenu.test.jsx](__tests__/IndicatorMenu.test.jsx) - Indicator menu (4 tests)
 - [__tests__/Dashboard.test.jsx](__tests__/Dashboard.test.jsx) - Dashboard integration (9 tests)
 - [__tests__/WatchlistPanel.test.jsx](__tests__/WatchlistPanel.test.jsx) - Watchlist panel (5 tests)
+- [__tests__/StrategyPage.test.jsx](__tests__/StrategyPage.test.jsx) - Strategy builder page (16 tests)
+- [e2e/smoke.spec.js](e2e/smoke.spec.js) - E2E smoke tests (5 tests)
+- [e2e/strategy.spec.js](e2e/strategy.spec.js) - E2E strategy tests (9 tests)
 
 ### Documentation
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture with all indicator formulas
@@ -109,10 +125,11 @@ cd backend && npm run dev    # port 4000
 npm run dev                  # port 3000
 
 # 3. Run tests
-cd backend && npm test       # backend: 166 tests
-cd .. && npm test            # frontend: 28 tests
+cd backend && npm test       # backend: 213 tests
+cd .. && npm test            # frontend: 44 tests
 
 # 4. Open http://localhost:3000
+# 5. Strategy Builder: http://localhost:3000/strategies
 ```
 
 ---

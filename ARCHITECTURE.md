@@ -31,6 +31,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | `TickerSearch` | Searchable dropdown for 487 S&P 500 tickers |
 | `IndicatorMenu` | Multi-select indicator toggle (14 indicators) |
 | `WatchlistPanel` | Ticker watchlist with grouped signal display + notifications |
+| `StrategyPage` | Strategy builder with AI input, manual condition editor, saved strategies library |
 
 ### Key Patterns
 
@@ -45,6 +46,7 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 - **Price chart overlays** — DeMark risk line, Bollinger Bands, and Ichimoku Cloud merged into price chart data via date lookup
 - **Min/max via loops** — avoids `Math.max(...largeArray)` stack overflow
 - **Incremental indicator fetching** — toggling indicators only fetches newly activated ones (no full reload), keeping the indicator menu open during multi-select
+- **Strategy buy/sell markers** — when `?strategies=active`, strategy triggers rendered as colored triangles (up=buy, down=sell) on the price chart
 - **Responsive layout** — CSS media queries at 768px and 480px breakpoints for header, KPI grid, chart headers/legends, stats grid, and dropdown menus
 
 ## Backend
@@ -75,6 +77,8 @@ Technical Indicators Dashboard — a separated frontend/backend application that
 | `/api/ichimoku?ticker=SPY` | GET | Ichimoku Cloud (9, 26, 52) |
 | `/api/confluence?ticker=SPY` | GET | Volume Confluence (DeMark + OBV) |
 | `/api/signals?ticker=SPY` | GET | Signal detection across all indicators (last 10 bars) |
+| `/api/strategy` | POST | Evaluate user-defined strategy conditions against indicator data |
+| `/api/generate-strategy` | POST | AI-powered: parse natural language into structured strategy conditions (Claude API) |
 | `/api/health` | GET | Health check with row count |
 
 ### Input Validation
@@ -271,6 +275,39 @@ POST_SIGNAL — 3 bars after any DeMark signal, checks follow-through.
 
 Reuses `calcDemark()` and `calcObv()` internally (shared functions also used by their respective endpoints).
 
+### Strategy Builder
+
+User-defined trading strategies evaluated against indicator data.
+
+```
+Strategy Condition Types:
+
+1. Threshold — compare indicator field to a fixed value
+   { indicator: "rsi", field: "rsi", operator: "<", value: 30 }
+   Operators: <, >, <=, >=, ==
+
+2. Crossover — detect when one field crosses above/below another
+   { indicator: "macd", field: "macd", operator: "crosses_above", field2: "signal" }
+   Operators: crosses_above, crosses_below
+
+Evaluation:
+  - Each condition checked against every bar
+  - Multiple conditions per strategy use AND logic
+  - Multiple strategies use OR logic (evaluated independently)
+  - Results are sparse: only bars where all conditions are true
+
+POST /api/strategy body:
+  { ticker: "SPY", strategies: [{ name: "...", conditions: [...] }] }
+  Returns: { results: [{ name, triggers: [{ date, close, ... }] }] }
+
+POST /api/generate-strategy body:
+  { prompt: "Buy when RSI is oversold", apiKey: "sk-..." }
+  Uses Claude API tool_use to parse natural language into conditions
+  Returns: { strategies: [{ name, conditions }] }
+```
+
+Supported indicators for strategy conditions: rsi, macd, bollinger, atr, adx, cci, roc, williamsR, stochRsi, eco, obv, demark, ichimoku, plus base fields (close, volume).
+
 ## Deployment URLs
 
 | Service | URL |
@@ -291,7 +328,7 @@ Reuses `calcDemark()` and `calcObv()` internally (shared functions also used by 
 ### Backend Tests (vitest + supertest)
 
 ```bash
-cd backend && npm test       # 166 tests
+cd backend && npm test       # 213 tests
 cd backend && npm run test:watch  # watch mode
 ```
 
@@ -305,11 +342,18 @@ cd backend && npm run test:watch  # watch mode
 | `__tests__/cache.test.js` | 1 | parseRows caching (referential identity) |
 | `__tests__/calcFunctions.test.js` | 11 | All 11 extracted calc functions (field structure validation) |
 | `__tests__/signals.test.js` | 6 | Signal detection endpoint (shape, validation, sorting, field checks) |
+| `__tests__/strategyEngine.test.js` | 7 | Strategy engine: threshold, crossover, AND logic, impossible conditions, error handling |
+| `__tests__/strategyEndpoint.test.js` | 6 | POST /api/strategy: valid input, invalid ticker, malformed conditions, multiple strategies |
+| `__tests__/generateStrategy.test.js` | 2 | POST /api/generate-strategy: input validation |
+| `__tests__/price.test.js` | — | Price endpoint tests |
+| `__tests__/admin.test.js` | — | Admin endpoint tests |
+| `__tests__/rateLimit.test.js` | — | Rate limiting tests |
+| `__tests__/signalValidation.test.js` | — | Signal validation tests |
 
 ### Frontend Tests (vitest + jsdom + React Testing Library)
 
 ```bash
-npm test                     # 28 tests
+npm test                     # 44 tests
 npm run test:watch           # watch mode
 ```
 
@@ -320,6 +364,18 @@ npm run test:watch           # watch mode
 | `__tests__/IndicatorMenu.test.jsx` | 4 | Badge count, toggle callback, 13 indicators listed, unique colors |
 | `__tests__/Dashboard.test.jsx` | 9 | Loading skeleton, empty data, chart render, KPI cards, range buttons, signal badge, error UI, confluence |
 | `__tests__/WatchlistPanel.test.jsx` | 5 | Watchlist rendering, signal rows, empty state, close handler, signal count |
+| `__tests__/StrategyPage.test.jsx` | 16 | Strategy builder: AI input, manual conditions, saved strategies, form validation |
+
+### E2E Tests (Playwright)
+
+```bash
+npx playwright test          # 14 tests (requires running server)
+```
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `e2e/smoke.spec.js` | 5 | Dashboard smoke tests |
+| `e2e/strategy.spec.js` | 9 | Strategy builder E2E flows |
 
 ### Test Architecture
 
@@ -337,8 +393,8 @@ cd backend && npm run dev    # port 4000
 npm run dev                  # port 3000
 
 # Run all tests
-cd backend && npm test       # backend (137 tests)
-cd .. && npm test            # frontend (20 tests)
+cd backend && npm test       # backend (213 tests)
+cd .. && npm test            # frontend (44 tests)
 ```
 
 ## Project Structure
@@ -347,19 +403,27 @@ cd .. && npm test            # frontend (20 tests)
 technical_indicators/
 ├── app/
 │   ├── page.js              # Next.js entry
-│   └── ECOComparison.jsx    # Dashboard component
+│   ├── ECOComparison.jsx    # Dashboard component (+ strategy markers)
+│   └── strategies/
+│       └── page.jsx         # Strategy Builder page
 ├── __tests__/               # Frontend tests
 │   ├── setup.js             # Test setup (jest-dom)
 │   ├── fmtVol.test.js       # Format helper tests
 │   ├── TickerSearch.test.jsx # Ticker search component tests
 │   ├── IndicatorMenu.test.jsx # Indicator menu component tests
-│   └── Dashboard.test.jsx   # Dashboard integration tests
+│   ├── Dashboard.test.jsx   # Dashboard integration tests
+│   └── StrategyPage.test.jsx # Strategy builder tests
+├── e2e/                     # E2E tests (Playwright)
+│   ├── smoke.spec.js        # Dashboard smoke tests
+│   └── strategy.spec.js     # Strategy builder E2E tests
 ├── backend/
-│   ├── __tests__/           # Backend tests
-│   │   ├── math.test.js     # EMA/DEMA unit tests
-│   │   ├── validation.test.js # Input validation tests
-│   │   ├── endpoints.test.js  # All 13 indicator API tests
-│   │   └── errors.test.js   # Error handling + performance tests
+│   ├── __tests__/           # Backend tests (15 files)
+│   ├── lib/
+│   │   └── strategyEngine.js # Strategy evaluation engine
+│   ├── routes/
+│   │   ├── strategy.js      # POST /api/strategy
+│   │   └── generateStrategy.js # POST /api/generate-strategy (AI)
+│   ├── indicators/          # Indicator calculation modules
 │   ├── server.js            # Express API
 │   ├── package.json
 │   ├── vercel.json          # Serverless config
